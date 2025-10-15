@@ -54,6 +54,7 @@ export function AgentConfigForm({ onSubmit, initialConfig = {} }: AgentConfigFor
   const [selectedTools, setSelectedTools] = useState<string[]>(initialConfig.tools || []);
   const [type, setType] = useState(initialConfig.type || 'custom');
   const [newTool, setNewTool] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleAddTool = (tool: string) => {
     if (tool && !selectedTools.includes(tool)) {
@@ -65,15 +66,41 @@ export function AgentConfigForm({ onSubmit, initialConfig = {} }: AgentConfigFor
     setSelectedTools(selectedTools.filter(t => t !== tool));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit({
-      name,
-      persona,
-      voice,
-      tools: selectedTools,
-      type,
-    });
+    setLoading(true);
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/agents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          role: persona,
+          goals: selectedTools,
+          tone: voice.includes('friendly') ? 'friendly' : voice.includes('warm') ? 'friendly' : 'neutral'
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create agent');
+      }
+
+      const data = await response.json();
+      onSubmit(data.agent);
+    } catch (error) {
+      console.error('Error creating agent:', error);
+      // Fallback to original behavior for now
+      onSubmit({
+        name,
+        persona,
+        voice,
+        tools: selectedTools,
+        type,
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -168,8 +195,8 @@ export function AgentConfigForm({ onSubmit, initialConfig = {} }: AgentConfigFor
         </div>
       </div>
 
-      <Button type="submit" className="w-full">
-        {initialConfig.name ? 'Update Agent' : 'Create Agent'}
+      <Button type="submit" className="w-full" disabled={loading}>
+        {loading ? 'Creating...' : (initialConfig.name ? 'Update Agent' : 'Create Agent')}
       </Button>
     </form>
   );

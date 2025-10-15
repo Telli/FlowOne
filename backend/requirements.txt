@@ -1,0 +1,16 @@
+fastapi
+uvicorn[standard]
+python-dotenv
+pydantic-settings
+sqlmodel
+httpx
+websockets
+langfuse
+faiss-cpu
+pipecat-ai
+pytest
+pytest-asyncio
+pytest-cov
+respx
+
+

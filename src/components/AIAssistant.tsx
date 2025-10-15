@@ -7,6 +7,7 @@ import { Badge } from "./ui/badge";
 import { ScrollArea } from "./ui/scroll-area";
 import { motion, AnimatePresence } from "motion/react";
 import { AgentConfigForm } from "./AgentConfigForm";
+import { nlpCommands } from "../lib/apiClient";
 
 interface Message {
   id: string;
@@ -22,9 +23,11 @@ interface Message {
 interface AIAssistantProps {
   onCommand: (command: string) => void;
   messages: Message[];
+  sessionEvents?: import("../lib/types").SessionEvent[];
+  onTraceId?: (traceId: string) => void;
 }
 
-export function AIAssistant({ onCommand, messages }: AIAssistantProps) {
+export function AIAssistant({ onCommand, messages, sessionEvents = [], onTraceId }: AIAssistantProps) {
   const [mode, setMode] = useState<'chat' | 'voice' | 'form'>('chat');
   const [input, setInput] = useState('');
   const [isListening, setIsListening] = useState(false);
@@ -81,10 +84,26 @@ export function AIAssistant({ onCommand, messages }: AIAssistantProps) {
     }
   };
 
-  const handleSend = () => {
-    if (input.trim()) {
-      onCommand(input);
-      setInput('');
+  const handleSend = async () => {
+    if (!input.trim()) return;
+    const text = input;
+    setInput('');
+    // forward to existing command bus for UI feedback
+    onCommand(text);
+    // also call backend NLP to drive structured actions
+    try {
+      const cmd = await nlpCommands(text);
+      if (cmd.action === 'create' && cmd.config) {
+        onCommand(`Create ${cmd.config.name || 'agent'}`);
+      } else if (cmd.action === 'modify' && cmd.modification) {
+        onCommand(`Modify agent`);
+      }
+      if ((cmd as any).trace_id) {
+        if (onTraceId) onTraceId((cmd as any).trace_id);
+        console.log('trace_id', (cmd as any).trace_id);
+      }
+    } catch (e) {
+      // ignore; UI already handled local path
     }
   };
 
@@ -230,6 +249,55 @@ export function AIAssistant({ onCommand, messages }: AIAssistantProps) {
             </div>
           </ScrollArea>
         </>
+      )}
+
+      {/* Session Status - Show when session events are available */}
+      {sessionEvents.length > 0 && (
+        <div className="border-t border-border pt-4 space-y-3">
+          {/* Persona Chips */}
+          <div>
+            <div className="text-xs text-muted-foreground mb-2">Current Persona:</div>
+            {(() => {
+              const latestPersona = sessionEvents
+                .slice()
+                .reverse()
+                .find(e => e.persona)?.persona;
+              const chips = latestPersona ? [
+                latestPersona.tone || "neutral",
+                ...(latestPersona.goals || []).slice(0, 3)
+              ] : [];
+              return (
+                <div className="flex gap-2 flex-wrap">
+                  {chips.length > 0 ? chips.map((chip, i) => (
+                    <Badge key={i} variant="secondary" className="text-xs">
+                      {chip}
+                    </Badge>
+                  )) : (
+                    <span className="text-xs opacity-60">No persona data</span>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+
+          {/* Recent Transcript */}
+          <div>
+            <div className="text-xs text-muted-foreground mb-2">Recent Activity:</div>
+            <div className="space-y-1 max-h-32 overflow-y-auto">
+              {sessionEvents.slice(-5).map((event, i) => (
+                <div key={i} className="text-xs flex items-center gap-2">
+                  <span className={`inline-block w-2 h-2 rounded-full ${
+                    event.type === "agent.speech" ? "bg-blue-500" :
+                    event.type === "speech.final" ? "bg-green-500" :
+                    event.type === "session.started" ? "bg-purple-500" : "bg-gray-400"
+                  }`}></span>
+                  <span>{event.type}</span>
+                  {event.text && <span className="truncate opacity-70">"{event.text.slice(0, 30)}{event.text.length > 30 ? '...' : ''}"</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Input Area - Hide when in form mode */}

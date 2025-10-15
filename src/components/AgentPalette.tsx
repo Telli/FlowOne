@@ -1,6 +1,8 @@
 import { GraduationCap, Headphones, Briefcase, MessageCircle, Lightbulb } from "lucide-react";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
+import { useEffect, useState } from "react";
+import { getTemplates, TemplateItem } from "../lib/apiClient";
 
 interface AgentTemplate {
   id: string;
@@ -10,35 +12,11 @@ interface AgentTemplate {
   color: string;
 }
 
-const templates: AgentTemplate[] = [
-  {
-    id: "sales",
-    name: "Sales Agent",
-    icon: <Briefcase className="w-5 h-5" />,
-    description: "Professional & persuasive",
-    color: "bg-blue-500"
-  },
-  {
-    id: "tutor",
-    name: "Math Tutor",
-    icon: <GraduationCap className="w-5 h-5" />,
-    description: "Friendly & patient",
-    color: "bg-green-500"
-  },
-  {
-    id: "support",
-    name: "Support Agent",
-    icon: <Headphones className="w-5 h-5" />,
-    description: "Empathetic & helpful",
-    color: "bg-purple-500"
-  },
-  {
-    id: "coach",
-    name: "Life Coach",
-    icon: <Lightbulb className="w-5 h-5" />,
-    description: "Motivating & inspiring",
-    color: "bg-orange-500"
-  }
+const localTemplates: AgentTemplate[] = [
+  { id: "sales", name: "Sales Agent", icon: <Briefcase className="w-5 h-5" />, description: "Professional & persuasive", color: "bg-blue-500" },
+  { id: "tutor", name: "Math Tutor", icon: <GraduationCap className="w-5 h-5" />, description: "Friendly & patient", color: "bg-green-500" },
+  { id: "support", name: "Support Agent", icon: <Headphones className="w-5 h-5" />, description: "Empathetic & helpful", color: "bg-purple-500" },
+  { id: "coach", name: "Life Coach", icon: <Lightbulb className="w-5 h-5" />, description: "Motivating & inspiring", color: "bg-orange-500" },
 ];
 
 interface AgentPaletteProps {
@@ -46,6 +24,24 @@ interface AgentPaletteProps {
 }
 
 export function AgentPalette({ onTalkToAI }: AgentPaletteProps) {
+  const [templates, setTemplates] = useState<AgentTemplate[]>(localTemplates);
+
+  useEffect(() => {
+    getTemplates()
+      .then((list: TemplateItem[]) => {
+        const mapped: AgentTemplate[] = list.map((t) => ({
+          id: t.key,
+          name: t.name || t.key,
+          icon: <Lightbulb className="w-5 h-5" />,
+          description: t.description || "",
+          color: "bg-blue-500",
+        }));
+        if (mapped.length > 0) setTemplates(mapped);
+      })
+      .catch(() => {
+        // keep local defaults
+      });
+  }, []);
   const onDragStart = (event: React.DragEvent, template: AgentTemplate) => {
     event.dataTransfer.setData('application/reactflow', JSON.stringify(template));
     event.dataTransfer.effectAllowed = 'move';

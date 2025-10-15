@@ -8,5 +8,9 @@ websockets
 langfuse
 faiss-cpu
 pipecat-ai
+pytest
+pytest-asyncio
+pytest-cov
+respx
 
 

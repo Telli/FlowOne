@@ -46,5 +46,73 @@ export async function getVoiceToken(sessionId: string): Promise<{ room: string; 
   return res.json();
 }
 
+// NLP Commands
+export async function nlpCommands(text: string): Promise<{ action: string; config?: any; modification?: any; details?: string[]; trace_id?: string }>{
+  const res = await fetch(`${API_URL}/nlp/commands`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text })
+  });
+  if (!res.ok) throw new Error(`nlpCommands failed: ${res.status}`);
+  return res.json();
+}
+
+// Flows
+export async function createFlow(name: string): Promise<{ flowId: string; trace_id?: string }> {
+  const res = await fetch(`${API_URL}/flows`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name })
+  });
+  if (!res.ok) throw new Error(`createFlow failed: ${res.status}`);
+  const json = await res.json();
+  return { flowId: json.flowId as string, trace_id: json.trace_id };
+}
+
+export async function putFlow(flowId: string, graph: { nodes: any[]; edges: any[] }): Promise<string | undefined> {
+  const res = await fetch(`${API_URL}/flows/${flowId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(graph)
+  });
+  if (!res.ok) throw new Error(`putFlow failed: ${res.status}`);
+  const json = await res.json();
+  return json.trace_id as string | undefined;
+}
+
+export async function getFlow(flowId: string): Promise<{ nodes: any[]; edges: any[]; trace_id?: string }>{
+  const res = await fetch(`${API_URL}/flows/${flowId}`);
+  if (!res.ok) throw new Error(`getFlow failed: ${res.status}`);
+  return res.json();
+}
+
+export async function listFlows(): Promise<{ id: string; name: string; updated_at: string }[]>{
+  const res = await fetch(`${API_URL}/flows`);
+  if (!res.ok) throw new Error(`listFlows failed: ${res.status}`);
+  const json = await res.json();
+  return json.flows as any;
+}
+
+// Templates
+export interface TemplateItem { id: string; key: string; name: string; description?: string; color?: string; config?: any }
+export async function getTemplates(): Promise<TemplateItem[]>{
+  const res = await fetch(`${API_URL}/templates`);
+  if (!res.ok) throw new Error(`getTemplates failed: ${res.status}`);
+  const json = await res.json();
+  return json.templates as TemplateItem[];
+}
+
+// Agents
+export async function patchAgent(agentId: string, patch: { role?: string; goals?: string[]; tone?: string; style?: any }): Promise<string | undefined> {
+  const res = await fetch(`${API_URL}/agents/${agentId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch)
+  });
+  if (!res.ok) throw new Error(`patchAgent failed: ${res.status}`);
+  const json = await res.json();
+  return json.trace_id as string | undefined;
+}
+
 
 

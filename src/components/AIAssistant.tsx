@@ -7,6 +7,7 @@ import { Badge } from "./ui/badge";
 import { ScrollArea } from "./ui/scroll-area";
 import { motion, AnimatePresence } from "motion/react";
 import { AgentConfigForm } from "./AgentConfigForm";
+import { nlpCommands } from "../lib/apiClient";
 
 interface Message {
   id: string;
@@ -23,9 +24,10 @@ interface AIAssistantProps {
   onCommand: (command: string) => void;
   messages: Message[];
   sessionEvents?: import("../lib/types").SessionEvent[];
+  onTraceId?: (traceId: string) => void;
 }
 
-export function AIAssistant({ onCommand, messages, sessionEvents = [] }: AIAssistantProps) {
+export function AIAssistant({ onCommand, messages, sessionEvents = [], onTraceId }: AIAssistantProps) {
   const [mode, setMode] = useState<'chat' | 'voice' | 'form'>('chat');
   const [input, setInput] = useState('');
   const [isListening, setIsListening] = useState(false);
@@ -82,10 +84,26 @@ export function AIAssistant({ onCommand, messages, sessionEvents = [] }: AIAssis
     }
   };
 
-  const handleSend = () => {
-    if (input.trim()) {
-      onCommand(input);
-      setInput('');
+  const handleSend = async () => {
+    if (!input.trim()) return;
+    const text = input;
+    setInput('');
+    // forward to existing command bus for UI feedback
+    onCommand(text);
+    // also call backend NLP to drive structured actions
+    try {
+      const cmd = await nlpCommands(text);
+      if (cmd.action === 'create' && cmd.config) {
+        onCommand(`Create ${cmd.config.name || 'agent'}`);
+      } else if (cmd.action === 'modify' && cmd.modification) {
+        onCommand(`Modify agent`);
+      }
+      if ((cmd as any).trace_id) {
+        if (onTraceId) onTraceId((cmd as any).trace_id);
+        console.log('trace_id', (cmd as any).trace_id);
+      }
+    } catch (e) {
+      // ignore; UI already handled local path
     }
   };
 

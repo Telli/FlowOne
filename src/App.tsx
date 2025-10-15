@@ -15,6 +15,7 @@ import { AIAssistant } from './components/AIAssistant';
 import { AgentTestDialog } from './components/AgentTestDialog';
 import { AgentNodeData } from './components/AgentNode';
 import { processCommand, AgentConfig } from './lib/aiProcessor';
+import { createFlow, getFlow, putFlow, patchAgent, listFlows } from './lib/apiClient';
 import { toast } from 'sonner@2.0.3';
 import { Toaster } from './components/ui/sonner';
 
@@ -33,6 +34,9 @@ function FlowOneApp() {
   const [isAIAssistantOpen, setIsAIAssistantOpen] = useState(false);
   const [nodes, setNodes, onNodesChange] = useNodesState<AgentNodeData>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [traceId, setTraceId] = useState<string>("");
+  const [flows, setFlows] = useState<{id:string; name:string}[]>([]);
+  const [selectedFlowId, setSelectedFlowId] = useState<string>("");
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -118,6 +122,32 @@ function FlowOneApp() {
   }, [nodes, setNodes, isAIAssistantOpen]);
 
   const modifyAgent = useCallback((agentId: string, modification: Partial<AgentConfig>) => {
+    // send PATCH to backend for persona/tone/goals if mapped
+    try {
+      const personaPatch: any = {};
+      if (modification.persona) personaPatch.role = modification.persona;
+      if (modification.tools) personaPatch.goals = modification.tools;
+      if (modification.voice) {
+        const v = modification.voice.toLowerCase();
+        if (v.includes('friendly') || v.includes('warm')) personaPatch.tone = 'friendly';
+        else if (v.includes('energetic')) personaPatch.tone = 'expert';
+        else if (v.includes('calm')) personaPatch.tone = 'neutral';
+      }
+      // parse style hints
+      if (modification.voice) {
+        const style: any = {};
+        const m = modification.voice.match(/\((\d+\.?\d*)x\)/i);
+        if (m) {
+          const speed = parseFloat(m[1]);
+          if (speed < 0.95) style.max_words = 80;
+          if (speed > 1.05) style.max_words = 40;
+        }
+        if (Object.keys(style).length) personaPatch.style = style;
+      }
+      if (Object.keys(personaPatch).length > 0) {
+        patchAgent(agentId, personaPatch).catch(()=>{});
+      }
+    } catch {}
     setNodes((nds) =>
       nds.map((node) => {
         if (node.id === agentId) {
@@ -266,6 +296,29 @@ function FlowOneApp() {
     [createAgent]
   );
 
+  // Flow persistence demo (save/load current graph)
+  const saveFlow = useCallback(async () => {
+    const created = await createFlow(`Flow ${Date.now()}`);
+    const traceSave = await putFlow(created.flowId, { nodes, edges });
+    const t = traceSave || created.trace_id || '';
+    if (t) setTraceId(t);
+    toast.success('Flow saved', { description: created.flowId });
+    // refresh flow list for selector
+    try {
+      const items = await listFlows();
+      setFlows(items.map(i => ({ id: i.id, name: i.name })));
+    } catch {}
+  }, [nodes, edges]);
+
+  const loadFlow = useCallback(async (flowId: string) => {
+    const graph = await getFlow(flowId);
+    // naive replace; assumes shapes align with ReactFlow
+    setNodes(graph.nodes as any);
+    setEdges(graph.edges as any);
+    if (graph.trace_id) setTraceId(graph.trace_id);
+    toast.success('Flow loaded', { description: flowId });
+  }, [setNodes, setEdges]);
+
   return (
     <div className="h-screen flex flex-col">
       <TopNav 
@@ -286,12 +339,39 @@ function FlowOneApp() {
             onDrop={onDrop}
             onDragOver={onDragOver}
           />
+          <div className="p-3 flex gap-2 items-center">
+            <button className="px-3 py-1 border rounded" onClick={saveFlow}>Save Flow</button>
+            <select
+              className="px-2 py-1 border rounded"
+              value={selectedFlowId}
+              onChange={(e) => setSelectedFlowId(e.target.value)}
+              onFocus={async () => {
+                try {
+                  const items = await listFlows();
+                  setFlows(items.map(i => ({ id: i.id, name: i.name })));
+                } catch {}
+              }}
+            >
+              <option value="">Select a saved flow…</option>
+              {flows.map((f) => (
+                <option key={f.id} value={f.id}>{f.name}</option>
+              ))}
+            </select>
+            <button
+              className="px-3 py-1 border rounded"
+              disabled={!selectedFlowId}
+              onClick={() => selectedFlowId && loadFlow(selectedFlowId)}
+            >
+              Load
+            </button>
+          </div>
         </div>
 
         {isAIAssistantOpen && (
           <AIAssistant
             onCommand={handleCommand}
             messages={messages}
+            onTraceId={(t) => setTraceId(t)}
           />
         )}
       </div>
@@ -318,6 +398,11 @@ function FlowOneApp() {
       )}
       
       <Toaster />
+      {traceId && (
+        <div className="fixed bottom-2 right-2 px-2 py-1 text-xs rounded bg-black text-white opacity-80">
+          trace: {traceId}
+        </div>
+      )}
     </div>
   );
 }

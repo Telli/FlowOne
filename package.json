@@ -15,9 +15,11 @@
     "dev:interactive": "npm run dev --workspace=frontend/interactive-studio",
     "dev:studio": "npm run dev --workspace=src",
     "build": "npm run build --workspaces",
-    "install-all": "npm install"
+    "install-all": "npm install",
+    "test:e2e": "playwright test"
   },
   "devDependencies": {
-    "concurrently": "^8.2.0"
+    "concurrently": "^8.2.0",
+    "@playwright/test": "^1.48.2"
   }
 }

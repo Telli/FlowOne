@@ -70,5 +70,13 @@ class SessionManager:
         if s := self.sessions.pop(session_id, None):
             s.close()
 
+    async def emit(self, session_id: str, event: Dict[str, Any]):
+        # Allow APIs to push events into a live session queue
+        s = self.sessions.get(session_id)
+        if not s:
+            return False
+        await s.queue.put(event)
+        return True
+
 
 

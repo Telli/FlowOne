@@ -1,4 +1,6 @@
 from backend.settings import get_settings
+from typing import Optional
+import uuid
 
 try:
     from langfuse import Langfuse
@@ -19,13 +21,18 @@ if Langfuse and settings.LANGFUSE_PUBLIC_KEY and settings.LANGFUSE_SECRET_KEY:
         _lf = None
 
 
-def trace_event(name: str, **kwargs):
-    if not _lf:
-        return
-    try:
-        _lf.event(name=name, metadata=kwargs)
-    except Exception:
-        pass
+def trace_event(name: str, **kwargs) -> str:
+    """Emit a Langfuse event and return a best-effort trace_id for client correlation."""
+    trace_id = kwargs.get("trace_id") or str(uuid.uuid4())
+    payload = dict(kwargs)
+    payload["trace_id"] = trace_id
+    if _lf:
+        try:
+            _lf.event(name=name, metadata=payload)
+        except Exception:
+            # fail open
+            pass
+    return trace_id
 
 
 

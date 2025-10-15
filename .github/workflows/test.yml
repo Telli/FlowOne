@@ -23,6 +23,14 @@ jobs:
         run: |
           cd backend
           pytest --cov=backend --cov-report=xml
+      - name: Upload backend coverage artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: |
+            backend/htmlcov
+            backend/coverage.xml
 
   frontend:
     runs-on: ubuntu-latest
@@ -37,6 +45,13 @@ jobs:
         run: |
           cd src
           npm test --silent
+      - name: Upload frontend coverage artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: |
+            src/coverage
 
   e2e:
     runs-on: ubuntu-latest

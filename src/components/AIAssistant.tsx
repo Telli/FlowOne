@@ -22,9 +22,10 @@ interface Message {
 interface AIAssistantProps {
   onCommand: (command: string) => void;
   messages: Message[];
+  sessionEvents?: import("../lib/types").SessionEvent[];
 }
 
-export function AIAssistant({ onCommand, messages }: AIAssistantProps) {
+export function AIAssistant({ onCommand, messages, sessionEvents = [] }: AIAssistantProps) {
   const [mode, setMode] = useState<'chat' | 'voice' | 'form'>('chat');
   const [input, setInput] = useState('');
   const [isListening, setIsListening] = useState(false);
@@ -230,6 +231,55 @@ export function AIAssistant({ onCommand, messages }: AIAssistantProps) {
             </div>
           </ScrollArea>
         </>
+      )}
+
+      {/* Session Status - Show when session events are available */}
+      {sessionEvents.length > 0 && (
+        <div className="border-t border-border pt-4 space-y-3">
+          {/* Persona Chips */}
+          <div>
+            <div className="text-xs text-muted-foreground mb-2">Current Persona:</div>
+            {(() => {
+              const latestPersona = sessionEvents
+                .slice()
+                .reverse()
+                .find(e => e.persona)?.persona;
+              const chips = latestPersona ? [
+                latestPersona.tone || "neutral",
+                ...(latestPersona.goals || []).slice(0, 3)
+              ] : [];
+              return (
+                <div className="flex gap-2 flex-wrap">
+                  {chips.length > 0 ? chips.map((chip, i) => (
+                    <Badge key={i} variant="secondary" className="text-xs">
+                      {chip}
+                    </Badge>
+                  )) : (
+                    <span className="text-xs opacity-60">No persona data</span>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+
+          {/* Recent Transcript */}
+          <div>
+            <div className="text-xs text-muted-foreground mb-2">Recent Activity:</div>
+            <div className="space-y-1 max-h-32 overflow-y-auto">
+              {sessionEvents.slice(-5).map((event, i) => (
+                <div key={i} className="text-xs flex items-center gap-2">
+                  <span className={`inline-block w-2 h-2 rounded-full ${
+                    event.type === "agent.speech" ? "bg-blue-500" :
+                    event.type === "speech.final" ? "bg-green-500" :
+                    event.type === "session.started" ? "bg-purple-500" : "bg-gray-400"
+                  }`}></span>
+                  <span>{event.type}</span>
+                  {event.text && <span className="truncate opacity-70">"{event.text.slice(0, 30)}{event.text.length > 30 ? '...' : ''}"</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Input Area - Hide when in form mode */}

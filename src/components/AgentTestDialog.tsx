@@ -7,6 +7,7 @@ import { Card } from "./ui/card";
 import { Mic, Send, MicOff, Bot, User as UserIcon } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { AgentNodeData } from "./AgentNode";
+import { createSession, openSessionEvents } from "../lib/apiClient";
 
 interface Message {
   id: string;
@@ -22,14 +23,9 @@ interface AgentTestDialogProps {
 }
 
 export function AgentTestDialog({ open, onOpenChange, agent }: AgentTestDialogProps) {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      role: 'agent',
-      content: `Hello! I'm ${agent.name}. ${agent.persona}. How can I help you today?`,
-      timestamp: new Date(),
-    }
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [sessionId, setSessionId] = useState<string>("");
+  const wsRef = useRef<WebSocket | null>(null);
   const [input, setInput] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
@@ -41,52 +37,60 @@ export function AgentTestDialog({ open, onOpenChange, agent }: AgentTestDialogPr
     }
   }, [messages]);
 
-  // Reset messages when agent changes
+  // Create session and open WS when dialog opens
   useEffect(() => {
-    if (open) {
-      setMessages([
-        {
-          id: '1',
-          role: 'agent',
-          content: `Hello! I'm ${agent.name}. ${agent.persona}. How can I help you today?`,
-          timestamp: new Date(),
-        }
-      ]);
+    let closed = false;
+    async function boot() {
+      try {
+        if (!open) return;
+        const sid = await createSession("agent_fitness_coach");
+        if (closed) return;
+        setSessionId(sid);
+        const ws = openSessionEvents(sid);
+        wsRef.current = ws;
+        ws.onmessage = (msg) => {
+          try {
+            const ev = JSON.parse(msg.data);
+            // Map events to UI messages for now
+            if (ev.type === "session.started") {
+              setMessages((m) => [
+                ...m,
+                {
+                  id: Date.now().toString(),
+                  role: "agent",
+                  content: `Session started. Persona tone: ${ev.persona?.tone ?? "neutral"}`,
+                  timestamp: new Date(),
+                },
+              ]);
+            } else if (ev.type === "agent.speech") {
+              setMessages((m) => [
+                ...m,
+                { id: Date.now().toString(), role: "agent", content: ev.text || "", timestamp: new Date() },
+              ]);
+            } else if (ev.type === "speech.final") {
+              setMessages((m) => [
+                ...m,
+                { id: Date.now().toString(), role: "user", content: ev.text || "", timestamp: new Date() },
+              ]);
+            }
+          } catch {}
+        };
+      } catch (e) {
+        // no-op for demo
+      }
     }
-  }, [open, agent.name, agent.persona]);
-
-  const generateAgentResponse = (userMessage: string): string => {
-    // Simple mock response generation based on agent type
-    const responses: Record<string, string[]> = {
-      sales: [
-        "I can help you close that deal. Let me check the CRM for the latest information.",
-        "That's a great opportunity! I'll schedule a follow-up call right away.",
-        "Based on our sales data, I'd recommend focusing on their pain points around efficiency.",
-      ],
-      tutor: [
-        "That's a great question! Let me break it down step by step for you.",
-        "Would you like me to create a practice quiz to help you understand this better?",
-        "Let me show you a different approach that might make this clearer.",
-      ],
-      support: [
-        "I understand your concern. Let me look into this issue for you right away.",
-        "I've found a solution in our knowledge base that should help.",
-        "I'm escalating this to ensure you get the best support possible.",
-      ],
-      coach: [
-        "That's an excellent goal! Let's create an action plan to achieve it.",
-        "I believe in your ability to make this happen. What's your first step?",
-        "Remember, progress is progress no matter how small. You're doing great!",
-      ],
-      custom: [
-        "I'm processing your request. How else can I assist you?",
-        "That's interesting. Let me analyze that for you.",
-        "I'm here to help. What would you like to know more about?",
-      ]
+    boot();
+    return () => {
+      closed = true;
+      if (wsRef.current) {
+        try { wsRef.current.close(); } catch {}
+        wsRef.current = null;
+      }
     };
+  }, [open]);
 
-    const agentResponses = responses[agent.type] || responses.custom;
-    return agentResponses[Math.floor(Math.random() * agentResponses.length)];
+  const generateAgentResponse = (_userMessage: string): string => {
+    return ""; // now driven by backend events
   };
 
   const handleSend = () => {
@@ -101,20 +105,8 @@ export function AgentTestDialog({ open, onOpenChange, agent }: AgentTestDialogPr
       setMessages((msgs) => [...msgs, userMessage]);
       setInput('');
       
-      // Simulate agent typing
-      setIsTyping(true);
-      
-      // Generate and add agent response after a delay
-      setTimeout(() => {
-        const agentMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          role: 'agent',
-          content: generateAgentResponse(input),
-          timestamp: new Date(),
-        };
-        setMessages((msgs) => [...msgs, agentMessage]);
-        setIsTyping(false);
-      }, 1000 + Math.random() * 1000); // Random delay between 1-2 seconds
+      // Let backend drive agent replies via WS
+      setIsTyping(false);
     }
   };
 

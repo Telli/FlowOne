@@ -1,10 +1,9 @@
 node_modules
 
-# Markdown documentation files (except README and getting started)
+# Markdown documentation files (except root README and GETTING_STARTED)
 *.md
-!README.md
-!GETTING_STARTED.md
-!QUICK_REFERENCE.md
+!/README.md
+!/GETTING_STARTED.md
 
 # Environment files
 .env

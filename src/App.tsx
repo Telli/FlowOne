@@ -4,8 +4,8 @@ import {
   Edge,
   Connection,
   addEdge,
-  useNodesState,
-  useEdgesState,
+  applyNodeChanges,
+  applyEdgeChanges,
   ReactFlowProvider,
 } from '@xyflow/react';
 import { AppShell } from '@flowone/ui';
@@ -15,11 +15,17 @@ import { AgentPalette } from './components/AgentPalette';
 import { FlowCanvas } from './components/FlowCanvas';
 import { AIAssistant } from './components/AIAssistant';
 import { AgentTestDialog } from './components/AgentTestDialog';
+import { NodeConfigDialog } from './components/NodeConfigDialog';
 import { AgentNodeData } from './components/AgentNode';
-import { processCommand, AgentConfig } from './lib/aiProcessor';
 import { createFlow, getFlow, putFlow, patchAgent, listFlows } from './lib/apiClient';
 import { toast } from 'sonner';
 import { Toaster } from './components/ui/sonner';
+import { useUIStore } from './store/uiStore';
+
+import { useAgentStore } from './store/agentStore';
+
+import { useSessionStore } from './store/sessionStore';
+
 
 interface Message {
   id: string;
@@ -32,12 +38,28 @@ interface Message {
   };
 }
 
+interface AgentConfig {
+  name: string;
+  persona: string;
+  voice: string;
+  tools: string[];
+  type: string;
+}
+
+
 function FlowOneApp() {
-  const [isAIAssistantOpen, setIsAIAssistantOpen] = useState(false);
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node<AgentNodeData>>([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  const { isAIAssistantOpen, setIsAIAssistantOpen, selectedAgentId, setSelectedAgentId, configuringNodeId, setConfiguringNodeId, traceId, setTraceId } = useUIStore();
+
+  const { nodes, edges, setNodes, setEdges, updateNodes, updateEdges } = useAgentStore();
+  const { wsConnected } = useSessionStore();
+
+  const onNodesChange = useCallback((changes: any) => {
+    updateNodes((nds) => applyNodeChanges(changes, nds));
+  }, [updateNodes]);
+  const onEdgesChange = useCallback((changes: any) => {
+    updateEdges((eds) => applyEdgeChanges(changes, eds));
+  }, [updateEdges]);
   const [activeEdgeId, setActiveEdgeId] = useState<string | null>(null);
-  const [traceId, setTraceId] = useState<string>("");
   const [flows, setFlows] = useState<{id:string; name:string}[]>([]);
   const [selectedFlowId, setSelectedFlowId] = useState<string>("");
   const [messages, setMessages] = useState<Message[]>([
@@ -48,11 +70,10 @@ function FlowOneApp() {
       timestamp: new Date(),
     }
   ]);
-  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [testingAgent, setTestingAgent] = useState<AgentNodeData | null>(null);
   const nodeIdCounter = useRef(1);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
-  
+
   // Highlight edge when routing occurs
   const highlightEdge = useCallback((sourceId: string, targetId: string) => {
     const edge = edges.find(e => e.source === sourceId && e.target === targetId);
@@ -64,15 +85,15 @@ function FlowOneApp() {
 
   const onConnect = useCallback(
     (connection: Connection) => {
-      setEdges((eds) => addEdge(connection, eds));
+      updateEdges((eds) => addEdge(connection, eds));
       toast.success('Agents connected ✓');
     },
-    [setEdges]
+    [updateEdges]
   );
 
   const createAgent = useCallback((config: AgentConfig, position: { x: number; y: number }) => {
     const id = `agent-${nodeIdCounter.current++}`;
-    
+
     const newNode: Node<AgentNodeData> = {
       id,
       type: 'agentNode',
@@ -96,7 +117,7 @@ function FlowOneApp() {
         },
         onTest: (agentId: string) => {
           // Use functional form to get current nodes
-          setNodes((nds) => {
+          updateNodes((nds) => {
             const node = nds.find(n => n.id === agentId);
             if (node) {
               setTestingAgent(node.data);
@@ -116,14 +137,15 @@ function FlowOneApp() {
             description: message
           });
         },
+        onConfigure: handleNodeConfigure,
       },
     };
 
-    setNodes((nds) => [...nds, newNode]);
-    
+    updateNodes((nds) => [...nds, newNode]);
+
     // Remove flash after animation
     setTimeout(() => {
-      setNodes((nds) =>
+      updateNodes((nds) =>
         nds.map((n) =>
           n.id === id ? { ...n, data: { ...n.data, isFlashing: false } } : n
         )
@@ -160,7 +182,7 @@ function FlowOneApp() {
         patchAgent(agentId, personaPatch).catch(()=>{});
       }
     } catch {}
-    setNodes((nds) =>
+    updateNodes((nds) =>
       nds.map((node) => {
         if (node.id === agentId) {
           return {
@@ -179,13 +201,30 @@ function FlowOneApp() {
 
     // Remove flash after animation
     setTimeout(() => {
-      setNodes((nds) =>
+      updateNodes((nds) =>
         nds.map((n) =>
           n.id === agentId ? { ...n, data: { ...n.data, isFlashing: false } } : n
         )
       );
     }, 600);
   }, [setNodes]);
+
+  const handleNodeConfigure = useCallback((nodeId: string) => {
+    setConfiguringNodeId(nodeId);
+  }, []);
+
+  const handleNodeUpdate = useCallback((updates: Partial<AgentNodeData>) => {
+    if (!configuringNodeId) return;
+
+    updateNodes((nodes) =>
+      nodes.map((node) =>
+        node.id === configuringNodeId
+          ? { ...node, data: { ...node.data, ...updates, updatedAt: 'Just now' } }
+          : node
+      )
+    );
+    setConfiguringNodeId(null);
+  }, [configuringNodeId, setNodes]);
 
   const handleCommand = useCallback((command: string) => {
     // Add user message
@@ -197,56 +236,15 @@ function FlowOneApp() {
     };
     setMessages((msgs) => [...msgs, userMessage]);
 
-    // Process command
-    const result = processCommand(command);
-
-    // Add AI response
+    // Add AI response message
     const aiMessage: Message = {
       id: (Date.now() + 1).toString(),
       type: 'ai',
-      content: result.response,
+      content: command,
       timestamp: new Date(),
-      action: {
-        type: result.action,
-        details: result.details,
-      },
     };
     setMessages((msgs) => [...msgs, aiMessage]);
-
-    // Execute action
-    if (result.action === 'create' && result.config) {
-      const position = {
-        x: Math.random() * 400 + 100,
-        y: Math.random() * 300 + 100,
-      };
-      createAgent(result.config, position);
-      toast.success(`${result.config.name} created! ✓`, {
-        description: 'Agent added to canvas'
-      });
-    } else if (result.action === 'modify' && result.modification) {
-      if (selectedAgentId) {
-        modifyAgent(selectedAgentId, result.modification);
-        toast.success('Agent updated! ⚡', {
-          description: 'Changes applied'
-        });
-      } else if (nodes.length > 0) {
-        // Modify the most recently created agent
-        const lastNode = nodes[nodes.length - 1];
-        modifyAgent(lastNode.id, result.modification);
-        toast.success('Agent updated! ⚡', {
-          description: 'Changes applied'
-        });
-      } else {
-        toast.error('No agent selected', {
-          description: 'Click 💬 on an agent card first'
-        });
-      }
-    } else if (result.action === 'unknown') {
-      toast.info('Not sure what to do', {
-        description: 'Try a different command'
-      });
-    }
-  }, [createAgent, modifyAgent, selectedAgentId, nodes]);
+  }, []);
 
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
@@ -261,7 +259,7 @@ function FlowOneApp() {
       if (!templateData) return;
 
       const template = JSON.parse(templateData);
-      
+
       const position = {
         x: event.clientX - 140,
         y: event.clientY - 120,
@@ -310,25 +308,35 @@ function FlowOneApp() {
 
   // Flow persistence demo (save/load current graph)
   const saveFlow = useCallback(async () => {
-    const created = await createFlow(`Flow ${Date.now()}`);
-    const traceSave = await putFlow(created.flowId, { nodes, edges });
-    const t = traceSave || created.trace_id || '';
-    if (t) setTraceId(t);
-    toast.success('Flow saved', { description: created.flowId });
-    // refresh flow list for selector
     try {
-      const items = await listFlows();
-      setFlows(items.map(i => ({ id: i.id, name: i.name })));
-    } catch {}
+      const created = await createFlow(`Flow ${Date.now()}`);
+      const traceSave = await putFlow(created.flowId, { nodes, edges });
+      const t = traceSave || created.trace_id || '';
+      if (t) setTraceId(t);
+      toast.success('Flow saved', { description: created.flowId });
+      // refresh flow list for selector
+      try {
+        const items = await listFlows();
+        setFlows(items.map(i => ({ id: i.id, name: i.name })));
+      } catch (e: any) {
+        toast.info('Could not refresh saved flows', { description: e?.message } as any);
+      }
+    } catch (e: any) {
+      toast.error('Failed to save flow', { description: e?.message || 'Please try again' } as any);
+    }
   }, [nodes, edges]);
 
   const loadFlow = useCallback(async (flowId: string) => {
-    const graph = await getFlow(flowId);
-    // naive replace; assumes shapes align with ReactFlow
-    setNodes(graph.nodes as any);
-    setEdges(graph.edges as any);
-    if (graph.trace_id) setTraceId(graph.trace_id);
-    toast.success('Flow loaded', { description: flowId });
+    try {
+      const graph = await getFlow(flowId);
+      // naive replace; assumes shapes align with ReactFlow
+      setNodes(graph.nodes as any);
+      setEdges(graph.edges as any);
+      if (graph.trace_id) setTraceId(graph.trace_id);
+      toast.success('Flow loaded', { description: flowId });
+    } catch (e: any) {
+      toast.error('Failed to load flow', { description: e?.message || flowId } as any);
+    }
   }, [setNodes, setEdges]);
 
   return (
@@ -341,13 +349,17 @@ function FlowOneApp() {
           className="gap-2"
         >
           <Bot className="w-5 h-5" />
+          <span
+            className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-emerald-500' : 'bg-gray-400'}`}
+            title={wsConnected ? 'WebSocket connected' : 'WebSocket disconnected'}
+          />
           AI Assistant
         </Button>
       }
     >
       <div className="h-full flex overflow-hidden">
         <AgentPalette onTalkToAI={() => setIsAIAssistantOpen(true)} />
-        
+
         <div ref={reactFlowWrapper} className="flex-1">
           <FlowCanvas
             nodes={nodes}
@@ -369,7 +381,9 @@ function FlowOneApp() {
                 try {
                   const items = await listFlows();
                   setFlows(items.map(i => ({ id: i.id, name: i.name })));
-                } catch {}
+                } catch (e: any) {
+                  toast.error('Failed to list flows', { description: e?.message } as any);
+                }
               }}
             >
               <option value="">Select a saved flow…</option>
@@ -392,10 +406,13 @@ function FlowOneApp() {
             onCommand={handleCommand}
             messages={messages}
             onTraceId={(t) => setTraceId(t)}
+            nodes={nodes}
+            edges={edges}
+            selectedNodeId={selectedAgentId}
           />
         )}
       </div>
-      
+
       {/* Test Dialog */}
       {testingAgent && (
         <AgentTestDialog
@@ -404,7 +421,7 @@ function FlowOneApp() {
             if (!open) {
               setTestingAgent(null);
               // Reset agent status
-              setNodes((nds) =>
+              updateNodes((nds) =>
                 nds.map((n) =>
                   n.data.id === testingAgent.id
                     ? { ...n, data: { ...n.data, status: 'ai-configured' as const } }
@@ -416,7 +433,24 @@ function FlowOneApp() {
           agent={testingAgent}
         />
       )}
-      
+
+      {/* Node Config Dialog */}
+      {configuringNodeId && (
+        (() => {
+          const node = nodes.find(n => n.id === configuringNodeId);
+          return node ? (
+            <NodeConfigDialog
+              open={!!configuringNodeId}
+              onOpenChange={(open) => {
+                if (!open) setConfiguringNodeId(null);
+              }}
+              nodeData={node.data}
+              onUpdate={handleNodeUpdate}
+            />
+          ) : null;
+        })()
+      )}
+
       <Toaster />
       {traceId && (
         <div className="fixed bottom-2 right-2 px-2 py-1 text-xs rounded bg-black text-white opacity-80">

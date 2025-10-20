@@ -1,4 +1,3 @@
-import { useCallback } from 'react';
 import {
   ReactFlow,
   Background,
@@ -7,9 +6,6 @@ import {
   Node,
   Edge,
   Connection,
-  addEdge,
-  useNodesState,
-  useEdgesState,
   NodeTypes,
   ConnectionLineType,
 } from '@xyflow/react';
@@ -17,7 +13,7 @@ import '@xyflow/react/dist/style.css';
 import { AgentNode, AgentNodeData } from './AgentNode';
 
 const nodeTypes: NodeTypes = {
-  agentNode: AgentNode,
+  agentNode: AgentNode as any,
 };
 
 interface FlowCanvasProps {

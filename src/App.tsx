@@ -24,6 +24,8 @@ import { useUIStore } from './store/uiStore';
 
 import { useAgentStore } from './store/agentStore';
 
+import { useSessionStore } from './store/sessionStore';
+
 
 interface Message {
   id: string;
@@ -49,6 +51,8 @@ function FlowOneApp() {
   const { isAIAssistantOpen, setIsAIAssistantOpen, selectedAgentId, setSelectedAgentId, configuringNodeId, setConfiguringNodeId, traceId, setTraceId } = useUIStore();
 
   const { nodes, edges, setNodes, setEdges, updateNodes, updateEdges } = useAgentStore();
+  const { wsConnected } = useSessionStore();
+
   const onNodesChange = useCallback((changes: any) => {
     updateNodes((nds) => applyNodeChanges(changes, nds));
   }, [updateNodes]);
@@ -345,6 +349,10 @@ function FlowOneApp() {
           className="gap-2"
         >
           <Bot className="w-5 h-5" />
+          <span
+            className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-emerald-500' : 'bg-gray-400'}`}
+            title={wsConnected ? 'WebSocket connected' : 'WebSocket disconnected'}
+          />
           AI Assistant
         </Button>
       }

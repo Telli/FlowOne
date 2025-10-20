@@ -32,7 +32,7 @@ interface AgentTestDialogProps {
 
 export function AgentTestDialog({ open, onOpenChange, agent }: AgentTestDialogProps) {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [sessionId, setSessionId] = useState<string>("");
+
   const [traceId, setTraceId] = useState<string>("");
   const wsRef = useRef<WebSocket | null>(null);
   const [input, setInput] = useState('');
@@ -60,7 +60,7 @@ export function AgentTestDialog({ open, onOpenChange, agent }: AgentTestDialogPr
   });
 
   const { toast } = useToast();
-  const { addWsEvent } = useSessionStore();
+  const { sessionId, setSessionId, setWsConnected, addWsEvent, clearWsEvents } = useSessionStore();
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -85,6 +85,13 @@ export function AgentTestDialog({ open, onOpenChange, agent }: AgentTestDialogPr
         setSessionId(sid);
         const ws = openSessionEvents(sid);
         wsRef.current = ws;
+        ws.onopen = () => {
+          setWsConnected(true);
+        };
+        ws.onclose = () => {
+          setWsConnected(false);
+        };
+
         ws.onmessage = (msg) => {
           try {
             const ev = JSON.parse(msg.data);
@@ -201,6 +208,10 @@ export function AgentTestDialog({ open, onOpenChange, agent }: AgentTestDialogPr
         try { wsRef.current.close(); } catch {}
         wsRef.current = null;
       }
+      setWsConnected(false);
+      clearWsEvents();
+      setSessionId(null);
+
     };
   }, [open, enableAvatar]);
 

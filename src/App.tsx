@@ -304,25 +304,35 @@ function FlowOneApp() {
 
   // Flow persistence demo (save/load current graph)
   const saveFlow = useCallback(async () => {
-    const created = await createFlow(`Flow ${Date.now()}`);
-    const traceSave = await putFlow(created.flowId, { nodes, edges });
-    const t = traceSave || created.trace_id || '';
-    if (t) setTraceId(t);
-    toast.success('Flow saved', { description: created.flowId });
-    // refresh flow list for selector
     try {
-      const items = await listFlows();
-      setFlows(items.map(i => ({ id: i.id, name: i.name })));
-    } catch {}
+      const created = await createFlow(`Flow ${Date.now()}`);
+      const traceSave = await putFlow(created.flowId, { nodes, edges });
+      const t = traceSave || created.trace_id || '';
+      if (t) setTraceId(t);
+      toast.success('Flow saved', { description: created.flowId });
+      // refresh flow list for selector
+      try {
+        const items = await listFlows();
+        setFlows(items.map(i => ({ id: i.id, name: i.name })));
+      } catch (e: any) {
+        toast.info('Could not refresh saved flows', { description: e?.message } as any);
+      }
+    } catch (e: any) {
+      toast.error('Failed to save flow', { description: e?.message || 'Please try again' } as any);
+    }
   }, [nodes, edges]);
 
   const loadFlow = useCallback(async (flowId: string) => {
-    const graph = await getFlow(flowId);
-    // naive replace; assumes shapes align with ReactFlow
-    setNodes(graph.nodes as any);
-    setEdges(graph.edges as any);
-    if (graph.trace_id) setTraceId(graph.trace_id);
-    toast.success('Flow loaded', { description: flowId });
+    try {
+      const graph = await getFlow(flowId);
+      // naive replace; assumes shapes align with ReactFlow
+      setNodes(graph.nodes as any);
+      setEdges(graph.edges as any);
+      if (graph.trace_id) setTraceId(graph.trace_id);
+      toast.success('Flow loaded', { description: flowId });
+    } catch (e: any) {
+      toast.error('Failed to load flow', { description: e?.message || flowId } as any);
+    }
   }, [setNodes, setEdges]);
 
   return (
@@ -363,7 +373,9 @@ function FlowOneApp() {
                 try {
                   const items = await listFlows();
                   setFlows(items.map(i => ({ id: i.id, name: i.name })));
-                } catch {}
+                } catch (e: any) {
+                  toast.error('Failed to list flows', { description: e?.message } as any);
+                }
               }}
             >
               <option value="">Select a saved flow…</option>

@@ -3,6 +3,7 @@ import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { useEffect, useState } from "react";
 import { getTemplates, TemplateItem } from "../lib/apiClient";
+import { toast } from 'sonner';
 
 interface AgentTemplate {
   id: string;
@@ -38,7 +39,8 @@ export function AgentPalette({ onTalkToAI }: AgentPaletteProps) {
         }));
         if (mapped.length > 0) setTemplates(mapped);
       })
-      .catch(() => {
+      .catch((e) => {
+        toast.error('Failed to load templates', { description: (e as any)?.message } as any);
         // keep local defaults
       });
   }, []);

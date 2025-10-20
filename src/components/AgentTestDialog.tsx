@@ -4,10 +4,14 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { ScrollArea } from "./ui/scroll-area";
 import { Card } from "./ui/card";
-import { Mic, Send, MicOff, Bot, User as UserIcon } from "lucide-react";
-import { motion, AnimatePresence } from "motion/react";
+import { Mic, Send, MicOff, Bot, User as UserIcon, ExternalLink, Activity, MessageSquare, Clock } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { AgentNodeData } from "./AgentNode";
 import { createSession, openSessionEvents } from "../lib/apiClient";
+import { Checkbox } from "./ui/checkbox";
+import { Label } from "./ui/label";
+import { Slider } from "./ui/slider";
+import { Badge } from "./ui/badge";
 
 interface Message {
   id: string;
@@ -25,11 +29,28 @@ interface AgentTestDialogProps {
 export function AgentTestDialog({ open, onOpenChange, agent }: AgentTestDialogProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [sessionId, setSessionId] = useState<string>("");
+  const [traceId, setTraceId] = useState<string>("");
   const wsRef = useRef<WebSocket | null>(null);
   const [input, setInput] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [avatarStreamUrl, setAvatarStreamUrl] = useState<string | null>(null);
+  const [avatarLoading, setAvatarLoading] = useState(false);
+  const [enableAvatar, setEnableAvatar] = useState(true);
+  const [sessionStarted, setSessionStarted] = useState(false);
+  const [wsEvents, setWsEvents] = useState<{type: string; data: any; timestamp: Date}[]>([]);
+  
+  // Persona controls
+  const [brevity, setBrevity] = useState(50);
+  const [warmth, setWarmth] = useState(50);
+  
+  // Analytics
+  const [analytics, setAnalytics] = useState({
+    latency: 0,
+    tokens: 0,
+    turns: 0
+  });
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -43,7 +64,8 @@ export function AgentTestDialog({ open, onOpenChange, agent }: AgentTestDialogPr
     async function boot() {
       try {
         if (!open) return;
-        const sid = await createSession("agent_fitness_coach");
+        setAvatarLoading(true);
+        const sid = await createSession("agent_fitness_coach", enableAvatar);
         if (closed) return;
         setSessionId(sid);
         const ws = openSessionEvents(sid);
@@ -51,8 +73,26 @@ export function AgentTestDialog({ open, onOpenChange, agent }: AgentTestDialogPr
         ws.onmessage = (msg) => {
           try {
             const ev = JSON.parse(msg.data);
-            // Map events to UI messages for now
+            
+            // Add to WS event log
+            setWsEvents((events) => [...events.slice(-19), { type: ev.type, data: ev, timestamp: new Date() }]);
+            
+            // Track trace_id
+            if (ev.trace_id || ev.traceId) {
+              setTraceId(ev.trace_id || ev.traceId);
+            }
+            
+            // Update analytics
+            if (ev.latency_ms) {
+              setAnalytics((a) => ({ ...a, latency: ev.latency_ms }));
+            }
+            if (ev.tokens) {
+              setAnalytics((a) => ({ ...a, tokens: a.tokens + ev.tokens }));
+            }
+            
+            // Map events to UI messages
             if (ev.type === "session.started") {
+              setSessionStarted(true);
               setMessages((m) => [
                 ...m,
                 {
@@ -67,16 +107,34 @@ export function AgentTestDialog({ open, onOpenChange, agent }: AgentTestDialogPr
                 ...m,
                 { id: Date.now().toString(), role: "agent", content: ev.text || "", timestamp: new Date() },
               ]);
+              setAnalytics((a) => ({ ...a, turns: a.turns + 1 }));
             } else if (ev.type === "speech.final") {
               setMessages((m) => [
                 ...m,
                 { id: Date.now().toString(), role: "user", content: ev.text || "", timestamp: new Date() },
+              ]);
+            } else if (ev.type === "avatar.started") {
+              setAvatarStreamUrl(ev.videoStreamUrl || ev.video_stream_url || null);
+              setAvatarLoading(false);
+            } else if (ev.type === "avatar.error") {
+              console.warn("Avatar error:", ev.error);
+              setAvatarLoading(false);
+            } else if (ev.type === "route.auto") {
+              setMessages((m) => [
+                ...m,
+                {
+                  id: Date.now().toString(),
+                  role: "agent",
+                  content: `[Routed to ${ev.target_agent}]`,
+                  timestamp: new Date(),
+                },
               ]);
             }
           } catch {}
         };
       } catch (e) {
         // no-op for demo
+        setAvatarLoading(false);
       }
     }
     boot();
@@ -87,7 +145,7 @@ export function AgentTestDialog({ open, onOpenChange, agent }: AgentTestDialogPr
         wsRef.current = null;
       }
     };
-  }, [open]);
+  }, [open, enableAvatar]);
 
   const generateAgentResponse = (_userMessage: string): string => {
     return ""; // now driven by backend events
@@ -118,8 +176,40 @@ export function AgentTestDialog({ open, onOpenChange, agent }: AgentTestDialogPr
   };
 
   const toggleVoiceInput = () => {
-    setIsListening(!isListening);
-    // In production, this would use Web Speech API
+    if (!isListening) {
+      // Start listening with Web Speech API
+      if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+        const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+        const recognition = new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        recognition.lang = 'en-US';
+        
+        recognition.onstart = () => {
+          setIsListening(true);
+        };
+        
+        recognition.onresult = (event: any) => {
+          const transcript = event.results[0][0].transcript;
+          setInput(transcript);
+          setIsListening(false);
+        };
+        
+        recognition.onerror = () => {
+          setIsListening(false);
+        };
+        
+        recognition.onend = () => {
+          setIsListening(false);
+        };
+        
+        recognition.start();
+      } else {
+        alert('Speech recognition not supported in this browser');
+      }
+    } else {
+      setIsListening(false);
+    }
   };
 
   return (
@@ -135,27 +225,119 @@ export function AgentTestDialog({ open, onOpenChange, agent }: AgentTestDialogPr
           </DialogDescription>
         </DialogHeader>
 
-        {/* Agent Info Card */}
-        <Card className="p-3 bg-muted/50 border-purple-500/20">
-          <div className="space-y-1 text-sm">
-            <div className="flex items-center gap-2">
-              <span className="text-muted-foreground">Persona:</span>
-              <span>{agent.persona}</span>
+        {/* Session Controls */}
+        <Card className="p-3 bg-muted/50 border-purple-500/20 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="enable-avatar" 
+                checked={enableAvatar} 
+                onCheckedChange={(checked) => setEnableAvatar(checked as boolean)}
+                disabled={sessionStarted}
+              />
+              <Label htmlFor="enable-avatar" className="text-sm font-medium">Enable Avatar</Label>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-muted-foreground">Voice:</span>
-              <span>{agent.voice}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-muted-foreground">Tools:</span>
-              <span>{agent.tools.join(', ')}</span>
-            </div>
+            {sessionStarted && (
+              <div className="flex gap-2">
+                <Badge variant="outline" className="flex items-center gap-1">
+                  <Activity className="w-3 h-3" />
+                  {analytics.latency}ms
+                </Badge>
+                <Badge variant="outline" className="flex items-center gap-1">
+                  <MessageSquare className="w-3 h-3" />
+                  {analytics.tokens}
+                </Badge>
+                <Badge variant="outline" className="flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  {analytics.turns}
+                </Badge>
+              </div>
+            )}
           </div>
+          
+          {/* Trace ID */}
+          {traceId && (
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-muted-foreground">Trace:</span>
+              <a 
+                href={`${import.meta.env.VITE_LANGFUSE_URL || 'https://cloud.langfuse.com'}/trace/${traceId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline flex items-center gap-1"
+              >
+                {traceId.slice(0, 8)}...
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+          )}
+          
+          {/* Persona Controls */}
+          {sessionStarted && (
+            <div className="space-y-2">
+              <div>
+                <Label className="text-xs">Brevity: {brevity}%</Label>
+                <Slider 
+                  value={[brevity]} 
+                  onValueChange={(val) => setBrevity(val[0])}
+                  min={0}
+                  max={100}
+                  step={10}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Warmth: {warmth}%</Label>
+                <Slider 
+                  value={[warmth]} 
+                  onValueChange={(val) => setWarmth(val[0])}
+                  min={0}
+                  max={100}
+                  step={10}
+                  className="mt-1"
+                />
+              </div>
+            </div>
+          )}
         </Card>
+        
+        {/* WS Event Ribbon */}
+        {wsEvents.length > 0 && (
+          <Card className="p-2 bg-muted/30 border-blue-500/20">
+            <ScrollArea className="h-16">
+              <div className="space-y-1">
+                {wsEvents.slice(-5).reverse().map((event, idx) => (
+                  <div key={idx} className="text-[10px] font-mono text-muted-foreground flex items-center gap-2">
+                    <span className="text-blue-500">{event.type}</span>
+                    <span className="text-xs">{event.timestamp.toLocaleTimeString()}</span>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </Card>
+        )}
 
         {/* Messages */}
         <ScrollArea className="flex-1 pr-4">
           <div ref={scrollRef} className="space-y-4">
+            {/* Avatar Stream Display */}
+            {avatarStreamUrl && (
+              <div className="mb-4 flex justify-center">
+                <div className="w-full max-w-sm">
+                  <video
+                    src={avatarStreamUrl}
+                    autoPlay
+                    muted
+                    className="w-full h-64 bg-black rounded-lg"
+                  />
+                </div>
+              </div>
+            )}
+            {avatarLoading && (
+              <div className="mb-4 flex justify-center">
+                <div className="text-sm text-muted-foreground">Loading avatar...</div>
+              </div>
+            )}
+
             <AnimatePresence>
               {messages.map((message) => (
                 <motion.div

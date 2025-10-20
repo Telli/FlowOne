@@ -28,6 +28,7 @@ interface FlowCanvasProps {
   onConnect: (connection: Connection) => void;
   onDrop: (event: React.DragEvent) => void;
   onDragOver: (event: React.DragEvent) => void;
+  activeEdgeId?: string | null;
 }
 
 export function FlowCanvas({
@@ -38,12 +39,21 @@ export function FlowCanvas({
   onConnect,
   onDrop,
   onDragOver,
+  activeEdgeId,
 }: FlowCanvasProps) {
+  // Apply active styling to edges
+  const styledEdges = edges.map(edge => ({
+    ...edge,
+    animated: edge.id === activeEdgeId || edge.animated,
+    style: edge.id === activeEdgeId 
+      ? { stroke: '#10B981', strokeWidth: 4, filter: 'drop-shadow(0 0 8px #10B981)' }
+      : edge.style || { stroke: '#8B5CF6', strokeWidth: 2 },
+  }));
   return (
     <div className="flex-1 h-full bg-gray-50">
       <ReactFlow
         nodes={nodes}
-        edges={edges}
+        edges={styledEdges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}

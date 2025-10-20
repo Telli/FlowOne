@@ -1,15 +1,15 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from backend.memory.store import (
+from memory.store import (
     get_engine,
     Agent,
     create_db,
     upsert_agent,
     get_agent,
 )
-from backend.services.gemini_flash import synthesize_agent_card
-from backend.observability.langfuse import trace_event
+from services.gemini_flash import synthesize_agent_card
+from observability.langfuse import trace_event
 
 
 router = APIRouter()
@@ -20,34 +20,18 @@ class CreateAgentRequest(BaseModel):
     role: str
     goals: list[str] = []
     tone: str = "neutral"
+    avatarReplicaId: str | None = None
 
 class PatchAgentRequest(BaseModel):
     role: str | None = None
     goals: list[str] | None = None
     tone: str | None = None
     style: dict | None = None
+    avatarReplicaId: str | None = None
 
 
-@router.on_event("startup")
-def startup():
-    create_db(get_engine())
-    # seed default agent if not exists
-    default_id = "agent_fitness_coach"
-    if not get_agent(default_id):
-        card = {
-            "id": default_id,
-            "name": "Fitness Coach",
-            "persona": {
-                "role": "You are a concise fitness coach that tailors workouts.",
-                "goals": ["motivate", "10k-steps", "weekly-plan"],
-                "tone": "friendly",
-                "style": {"max_words": 120, "acknowledge_first": True},
-            },
-            "tools": [],
-            "memory": {"summaries": [], "vectors": []},
-            "routing": {"policies": []},
-        }
-        upsert_agent(Agent.from_card(card))
+# Database initialization moved to app.py startup event
+# (router startup events don't work reliably in included routers)
 
 
 @router.post("", response_model=dict)
@@ -55,10 +39,26 @@ def create_agent(body: CreateAgentRequest):
     card = synthesize_agent_card(
         name=body.name, role=body.role, goals=body.goals, tone=body.tone
     )
+    
+    # Get agent ID from card before creating Agent object
+    agent_id = card["id"]
+    
     agent = Agent.from_card(card)
+    if body.avatarReplicaId:
+        agent.avatar_replica_id = body.avatarReplicaId
+    
     upsert_agent(agent)
-    trace_id = trace_event("agent.create", agentId=agent.id)
-    return {"agent": agent.to_card(), "trace_id": trace_id}
+    
+    # Build response card after upsert (include avatar data if present)
+    response_card = dict(card)
+    if body.avatarReplicaId:
+        response_card["avatar"] = {
+            "replicaId": body.avatarReplicaId,
+            "thumbnailUrl": ""
+        }
+    
+    trace_id = trace_event("agent.create", agentId=agent_id)
+    return {"agent": response_card, "trace_id": trace_id}
 
 
 @router.get("/{agent_id}", response_model=dict)
@@ -86,9 +86,12 @@ def patch_agent(agent_id: str, body: PatchAgentRequest):
     if body.style is not None:
         persona["style"] = body.style
     card["persona"] = persona
-    upsert_agent(Agent.from_card(card))
+    updated_agent = Agent.from_card(card)
+    if body.avatarReplicaId is not None:
+        updated_agent.avatar_replica_id = body.avatarReplicaId
+    upsert_agent(updated_agent)
     trace_id = trace_event("agent.patch", agentId=agent_id)
-    return {"agent": card, "trace_id": trace_id}
+    return {"agent": updated_agent.to_card(), "trace_id": trace_id}
 
 
 

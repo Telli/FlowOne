@@ -2,7 +2,7 @@ from typing import Dict, List
 import json
 import httpx
 
-from backend.settings import get_settings
+from settings import get_settings
 
 
 def _fallback_card(name: str, role: str, goals: List[str], tone: str) -> Dict:

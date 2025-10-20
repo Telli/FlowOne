@@ -6,6 +6,7 @@ import { Button } from "./ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Badge } from "./ui/badge";
 import { X } from "lucide-react";
+import { AvatarSelector } from "./AvatarSelector";
 
 interface AgentConfigFormProps {
   onSubmit: (config: {
@@ -14,6 +15,7 @@ interface AgentConfigFormProps {
     voice: string;
     tools: string[];
     type: string;
+    avatarReplicaId?: string;
   }) => void;
   initialConfig?: {
     name?: string;
@@ -21,6 +23,7 @@ interface AgentConfigFormProps {
     voice?: string;
     tools?: string[];
     type?: string;
+    avatarReplicaId?: string;
   };
 }
 
@@ -55,6 +58,7 @@ export function AgentConfigForm({ onSubmit, initialConfig = {} }: AgentConfigFor
   const [type, setType] = useState(initialConfig.type || 'custom');
   const [newTool, setNewTool] = useState('');
   const [loading, setLoading] = useState(false);
+  const [avatarReplicaId, setAvatarReplicaId] = useState<string | undefined>(initialConfig.avatarReplicaId);
 
   const handleAddTool = (tool: string) => {
     if (tool && !selectedTools.includes(tool)) {
@@ -78,7 +82,8 @@ export function AgentConfigForm({ onSubmit, initialConfig = {} }: AgentConfigFor
           name,
           role: persona,
           goals: selectedTools,
-          tone: voice.includes('friendly') ? 'friendly' : voice.includes('warm') ? 'friendly' : 'neutral'
+          tone: voice.includes('friendly') ? 'friendly' : voice.includes('warm') ? 'friendly' : 'neutral',
+          avatarReplicaId: avatarReplicaId
         })
       });
 
@@ -97,6 +102,7 @@ export function AgentConfigForm({ onSubmit, initialConfig = {} }: AgentConfigFor
         voice,
         tools: selectedTools,
         type,
+        avatarReplicaId: avatarReplicaId
       });
     } finally {
       setLoading(false);
@@ -158,6 +164,14 @@ export function AgentConfigForm({ onSubmit, initialConfig = {} }: AgentConfigFor
             ))}
           </SelectContent>
         </Select>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="avatar">Avatar</Label>
+        <AvatarSelector
+          initialAvatarReplicaId={avatarReplicaId}
+          onSelect={(id) => setAvatarReplicaId(id)}
+        />
       </div>
 
       <div className="space-y-2">

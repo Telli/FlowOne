@@ -5,7 +5,7 @@ import { Input } from "./ui/input";
 import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { ScrollArea } from "./ui/scroll-area";
-import { motion, AnimatePresence } from "motion/react";
+import { motion, AnimatePresence } from "framer-motion";
 import { AgentConfigForm } from "./AgentConfigForm";
 import { nlpCommands } from "../lib/apiClient";
 

@@ -3,7 +3,7 @@ import pytest
 from unittest.mock import patch, MagicMock
 import json
 
-from backend.services.gemini_flash import (
+from services.gemini_flash import (
     synthesize_agent_card,
     parse_nlp_command,
     generate_agent_reply,
@@ -26,7 +26,7 @@ class TestGeminiFlash:
         assert "tools" in card
         assert "memory" in card
 
-    @patch("backend.services.gemini_flash.httpx.Client")
+    @patch("services.gemini_flash.httpx.Client")
     def test_synthesize_agent_card_success(self, mock_client):
         """Test successful agent card synthesis."""
         # Mock successful API response
@@ -55,7 +55,7 @@ class TestGeminiFlash:
         mock_response.raise_for_status = MagicMock()
         mock_client.return_value.__enter__.return_value.post.return_value = mock_response
 
-        with patch("backend.services.gemini_flash.get_settings") as mock_settings:
+        with patch("services.gemini_flash.get_settings") as mock_settings:
             mock_settings.return_value.GEMINI_API_KEY = "test_key"
             
             card = synthesize_agent_card("Test", "test role", ["goal"], "friendly")
@@ -63,13 +63,13 @@ class TestGeminiFlash:
             assert card["name"] == "Test Agent"
             assert "persona" in card
 
-    @patch("backend.services.gemini_flash.httpx.Client")
+    @patch("services.gemini_flash.httpx.Client")
     def test_synthesize_agent_card_fallback_on_error(self, mock_client):
         """Test fallback when API fails."""
         # Mock API error
         mock_client.return_value.__enter__.return_value.post.side_effect = Exception("API Error")
 
-        with patch("backend.services.gemini_flash.get_settings") as mock_settings:
+        with patch("services.gemini_flash.get_settings") as mock_settings:
             mock_settings.return_value.GEMINI_API_KEY = "test_key"
             
             card = synthesize_agent_card("Test", "role", ["goal"], "neutral")
@@ -80,7 +80,7 @@ class TestGeminiFlash:
 
     def test_synthesize_agent_card_no_api_key(self):
         """Test fallback when no API key is set."""
-        with patch("backend.services.gemini_flash.get_settings") as mock_settings:
+        with patch("services.gemini_flash.get_settings") as mock_settings:
             mock_settings.return_value.GEMINI_API_KEY = ""
             
             card = synthesize_agent_card("Test", "role", ["goal"], "neutral")
@@ -88,7 +88,7 @@ class TestGeminiFlash:
             # Should use fallback
             assert card["name"] == "Test"
 
-    @patch("backend.services.gemini_flash.httpx.Client")
+    @patch("services.gemini_flash.httpx.Client")
     def test_parse_nlp_command_success(self, mock_client):
         """Test successful NLP command parsing."""
         mock_response = MagicMock()
@@ -108,7 +108,7 @@ class TestGeminiFlash:
         mock_response.raise_for_status = MagicMock()
         mock_client.return_value.__enter__.return_value.post.return_value = mock_response
 
-        with patch("backend.services.gemini_flash.get_settings") as mock_settings:
+        with patch("services.gemini_flash.get_settings") as mock_settings:
             mock_settings.return_value.GEMINI_API_KEY = "test_key"
             
             result = parse_nlp_command("Create a sales agent")
@@ -118,7 +118,7 @@ class TestGeminiFlash:
 
     def test_parse_nlp_command_no_api_key(self):
         """Test NLP parsing fallback without API key."""
-        with patch("backend.services.gemini_flash.get_settings") as mock_settings:
+        with patch("services.gemini_flash.get_settings") as mock_settings:
             mock_settings.return_value.GEMINI_API_KEY = ""
             
             result = parse_nlp_command("test command")
@@ -126,7 +126,7 @@ class TestGeminiFlash:
             assert result["action"] == "unknown"
             assert result["details"] == ["fallback"]
 
-    @patch("backend.services.gemini_flash.httpx.Client")
+    @patch("services.gemini_flash.httpx.Client")
     def test_generate_agent_reply_success(self, mock_client):
         """Test successful agent reply generation."""
         mock_response = MagicMock()
@@ -142,7 +142,7 @@ class TestGeminiFlash:
         mock_response.raise_for_status = MagicMock()
         mock_client.return_value.__enter__.return_value.post.return_value = mock_response
 
-        with patch("backend.services.gemini_flash.get_settings") as mock_settings:
+        with patch("services.gemini_flash.get_settings") as mock_settings:
             mock_settings.return_value.GEMINI_API_KEY = "test_key"
             
             agent_card = {
@@ -160,7 +160,7 @@ class TestGeminiFlash:
 
     def test_generate_agent_reply_fallback(self):
         """Test reply generation fallback without API key."""
-        with patch("backend.services.gemini_flash.get_settings") as mock_settings:
+        with patch("services.gemini_flash.get_settings") as mock_settings:
             mock_settings.return_value.GEMINI_API_KEY = ""
             
             reply = generate_agent_reply("Hello", {})

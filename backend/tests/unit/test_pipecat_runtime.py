@@ -2,7 +2,7 @@
 import pytest
 import asyncio
 
-from backend.services.pipecat_runtime import Session, SessionManager
+from services.pipecat_runtime import Session, SessionManager
 
 
 class TestPipecatRuntime:

@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install)",
+      "Bash(npm --version)",
+      "Read(//c/Users/telli/Desktop/FlowOne/**)",
+      "Bash(npm install:*)",
+      "Bash(py:*)",
+      "Bash(pip install:*)",
+      "Bash(python:*)",
+      "Bash(npm ls:*)",
+      "Bash(npm run dev:all:*)",
+      "Bash(npm run dev:*)",
+      "Bash(taskkill:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

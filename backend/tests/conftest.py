@@ -7,9 +7,9 @@ from unittest.mock import patch
 import tempfile
 import os
 
-from backend.app import app
-from backend.memory.store import get_engine
-from backend.settings import Settings, get_settings
+from app import app
+from memory.store import get_engine
+from settings import Settings, get_settings
 
 
 @pytest.fixture(name="test_db_engine")

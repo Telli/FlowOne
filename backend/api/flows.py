@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Dict, Any
 
-from backend.memory.store import (
+from memory.store import (
     create_flow,
     get_flow,
     upsert_flow_graph,
@@ -12,7 +12,7 @@ from backend.memory.store import (
     get_flow_version,
     list_flows,
 )
-from backend.observability.langfuse import trace_event
+from observability.langfuse import trace_event
 
 
 router = APIRouter()

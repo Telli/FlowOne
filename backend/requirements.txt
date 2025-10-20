@@ -13,4 +13,9 @@ pytest-asyncio
 pytest-cov
 respx
 
+# Production Pipeline Components
+pipecat-ai[deepgram]  # Deepgram STT
+pipecat-ai[cartesia]  # Cartesia TTS
+google-generativeai  # Gemini Flash direct API
+
 

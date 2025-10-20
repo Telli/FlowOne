@@ -1,10 +1,11 @@
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
+import asyncio
 
-from backend.memory.store import get_agent, create_session, add_message
-from backend.services.pipecat_runtime import SessionManager
-from backend.services.gemini_flash import generate_agent_reply
-from backend.observability.langfuse import trace_event
+from memory.store import get_agent, create_session, add_message
+from services.pipecat_runtime import SessionManager
+from services.gemini_flash import generate_agent_reply
+from observability.langfuse import trace_event
 
 
 router = APIRouter()
@@ -13,19 +14,20 @@ session_manager = SessionManager()
 
 class CreateSessionRequest(BaseModel):
     agentId: str
+    enableAvatar: bool = False
 
 class PostMessageRequest(BaseModel):
     text: str
 
 
 @router.post("")
-def create_session_ep(body: CreateSessionRequest):
+async def create_session_ep(body: CreateSessionRequest):
     agent = get_agent(body.agentId)
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
     session_id = create_session(body.agentId)
-    session_manager.spawn(session_id, agent.to_card())
-    trace_id = trace_event("session.create", sessionId=session_id, agentId=body.agentId)
+    await session_manager.spawn(session_id, agent.to_card(), enable_avatar=body.enableAvatar)
+    trace_id = trace_event("session.create", sessionId=session_id, agentId=body.agentId, enableAvatar=body.enableAvatar)
     return {"sessionId": session_id, "trace_id": trace_id}
 
 
@@ -36,7 +38,7 @@ async def ws_events(ws: WebSocket, session_id: str):
         async for event in session_manager.events(session_id):
             await ws.send_json(event)
     except WebSocketDisconnect:
-        session_manager.close(session_id)
+        await session_manager.close(session_id)
 
 
 @router.post("/{session_id}/messages")

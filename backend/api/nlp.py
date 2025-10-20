@@ -1,8 +1,8 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import Literal, List, Dict, Any
-from backend.services.gemini_flash import parse_nlp_command
-from backend.observability.langfuse import trace_event
+from services.gemini_flash import parse_nlp_command
+from observability.langfuse import trace_event
 
 
 router = APIRouter()

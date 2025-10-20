@@ -25,11 +25,11 @@ export async function createAgent(input: {
   return json.agent as AgentCard;
 }
 
-export async function createSession(agentId: string): Promise<string> {
+export async function createSession(agentId: string, enableAvatar: boolean = false): Promise<string> {
   const res = await fetch(`${API_URL}/sessions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ agentId }),
+    body: JSON.stringify({ agentId, enableAvatar }),
   });
   if (!res.ok) throw new Error(`createSession failed: ${res.status}`);
   const json = await res.json();

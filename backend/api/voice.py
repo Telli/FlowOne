@@ -2,7 +2,7 @@ import time
 from fastapi import APIRouter, HTTPException, Query
 import httpx
 
-from backend.settings import get_settings
+from settings import get_settings
 
 
 router = APIRouter()
@@ -12,8 +12,15 @@ router = APIRouter()
 async def create_daily_token(sessionId: str = Query(...)):
     settings = get_settings()
     api_key = settings.DAILY_API_KEY
-    if not api_key:
-        raise HTTPException(status_code=500, detail="DAILY_API_KEY missing")
+
+    # For hackathon demo - return mock token if API key not available
+    if not api_key or api_key == "your_daily_api_key_here":
+        print("WARNING: DAILY_API_KEY not configured, returning mock token for demo")
+        return {
+            "room": f"flowone-{sessionId}",
+            "token": "mock-token-for-demo",
+            "warning": "Daily API key not configured - using mock token"
+        }
 
     room_name = f"flowone-{sessionId}"
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}

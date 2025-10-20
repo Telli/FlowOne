@@ -1,44 +1,45 @@
 import { useState } from "react";
 import { AgentCard } from "@flowone/agent-schema";
+import { AppShell, Button, Input } from "@flowone/ui";
 
 export default function App() {
   const [tab, setTab] = useState<"configure" | "test">("configure");
   const [agentCard, setAgentCard] = useState<AgentCard | null>(null);
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <header className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-semibold">FlowOne Interactive Studio</h1>
+    <AppShell
+      appId="configurator"
+      headerActions={
         <div className="flex gap-2">
-          <button
+          <Button
             onClick={() => setTab("configure")}
-            className={`px-3 py-1 rounded ${
-              tab === "configure" ? "bg-black text-white" : "border"
-            }`}
+            variant={tab === "configure" ? "default" : "outline"}
+            size="sm"
           >
             Configure
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => setTab("test")}
-            className={`px-3 py-1 rounded ${
-              tab === "test" ? "bg-black text-white" : "border"
-            }`}
+            variant={tab === "test" ? "default" : "outline"}
+            size="sm"
           >
             Test
-          </button>
+          </Button>
         </div>
-      </header>
-
-      {tab === "configure" ? (
-        <ConfigureTab onAgentCreated={setAgentCard} />
-      ) : (
-        <TestTab agentCard={agentCard} />
-      )}
-    </div>
+      }
+    >
+      <div className="p-6 max-w-6xl mx-auto h-full overflow-auto">
+        {tab === "configure" ? (
+          <ConfigureTab agentCard={agentCard} onAgentCreated={setAgentCard} />
+        ) : (
+          <TestTab agentCard={agentCard} />
+        )}
+      </div>
+    </AppShell>
   );
 }
 
-function ConfigureTab({ onAgentCreated }: { onAgentCreated: (card: AgentCard) => void }) {
+function ConfigureTab({ agentCard, onAgentCreated }: { agentCard: AgentCard | null; onAgentCreated: (card: AgentCard) => void }) {
   const [name, setName] = useState("Fitness Coach");
   const [role, setRole] = useState("You are a concise fitness coach that tailors workouts.");
   const [goals, setGoals] = useState("motivate,10k-steps,weekly-plan");
@@ -77,8 +78,8 @@ function ConfigureTab({ onAgentCreated }: { onAgentCreated: (card: AgentCard) =>
         <div className="space-y-4">
           <div>
             <label className="text-sm font-medium">Name</label>
-            <input
-              className="w-full border rounded p-2 mt-1"
+            <Input
+              className="mt-1"
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
@@ -87,7 +88,7 @@ function ConfigureTab({ onAgentCreated }: { onAgentCreated: (card: AgentCard) =>
           <div>
             <label className="text-sm font-medium">Role</label>
             <textarea
-              className="w-full border rounded p-2 mt-1"
+              className="w-full border border-input rounded-md p-2 mt-1 bg-background text-sm"
               value={role}
               onChange={(e) => setRole(e.target.value)}
               rows={3}
@@ -96,8 +97,8 @@ function ConfigureTab({ onAgentCreated }: { onAgentCreated: (card: AgentCard) =>
 
           <div>
             <label className="text-sm font-medium">Goals (comma-separated)</label>
-            <input
-              className="w-full border rounded p-2 mt-1"
+            <Input
+              className="mt-1"
               value={goals}
               onChange={(e) => setGoals(e.target.value)}
             />
@@ -117,13 +118,12 @@ function ConfigureTab({ onAgentCreated }: { onAgentCreated: (card: AgentCard) =>
             </select>
           </div>
 
-          <button
+          <Button
             onClick={createAgent}
             disabled={loading}
-            className="px-4 py-2 rounded bg-black text-white disabled:opacity-50"
           >
             {loading ? "Generating…" : "Generate Agent"}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -171,21 +171,20 @@ function TestTab({ agentCard }: { agentCard: AgentCard | null }) {
 
       <div className="flex gap-2 items-end mb-4">
         <div className="flex-1">
-          <label className="text-sm">Agent ID</label>
-          <input
+          <label className="text-sm font-medium">Agent ID</label>
+          <Input
             value={agentCard?.id || ""}
             readOnly
-            className="w-full border rounded p-2 bg-gray-50"
+            className="mt-1 bg-muted"
             placeholder="Create an agent first"
           />
         </div>
-        <button
+        <Button
           onClick={startSession}
           disabled={loading || !agentCard}
-          className="px-4 py-2 rounded bg-black text-white disabled:opacity-50"
         >
           {loading ? "Starting…" : "Start Session"}
-        </button>
+        </Button>
       </div>
 
       <div className="text-sm opacity-70">

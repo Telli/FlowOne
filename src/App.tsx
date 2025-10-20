@@ -8,7 +8,9 @@ import {
   useEdgesState,
   ReactFlowProvider,
 } from '@xyflow/react';
-import { TopNav } from './components/TopNav';
+import { AppShell } from '@flowone/ui';
+import { Bot } from 'lucide-react';
+import { Button } from './components/ui/button';
 import { AgentPalette } from './components/AgentPalette';
 import { FlowCanvas } from './components/FlowCanvas';
 import { AIAssistant } from './components/AIAssistant';
@@ -16,7 +18,7 @@ import { AgentTestDialog } from './components/AgentTestDialog';
 import { AgentNodeData } from './components/AgentNode';
 import { processCommand, AgentConfig } from './lib/aiProcessor';
 import { createFlow, getFlow, putFlow, patchAgent, listFlows } from './lib/apiClient';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { Toaster } from './components/ui/sonner';
 
 interface Message {
@@ -32,8 +34,9 @@ interface Message {
 
 function FlowOneApp() {
   const [isAIAssistantOpen, setIsAIAssistantOpen] = useState(false);
-  const [nodes, setNodes, onNodesChange] = useNodesState<AgentNodeData>([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node<AgentNodeData>>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  const [activeEdgeId, setActiveEdgeId] = useState<string | null>(null);
   const [traceId, setTraceId] = useState<string>("");
   const [flows, setFlows] = useState<{id:string; name:string}[]>([]);
   const [selectedFlowId, setSelectedFlowId] = useState<string>("");
@@ -49,6 +52,15 @@ function FlowOneApp() {
   const [testingAgent, setTestingAgent] = useState<AgentNodeData | null>(null);
   const nodeIdCounter = useRef(1);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  
+  // Highlight edge when routing occurs
+  const highlightEdge = useCallback((sourceId: string, targetId: string) => {
+    const edge = edges.find(e => e.source === sourceId && e.target === targetId);
+    if (edge) {
+      setActiveEdgeId(edge.id);
+      setTimeout(() => setActiveEdgeId(null), 2000); // Clear after 2s
+    }
+  }, [edges]);
 
   const onConnect = useCallback(
     (connection: Connection) => {
@@ -320,13 +332,20 @@ function FlowOneApp() {
   }, [setNodes, setEdges]);
 
   return (
-    <div className="h-screen flex flex-col">
-      <TopNav 
-        onAIAssistantToggle={() => setIsAIAssistantOpen(!isAIAssistantOpen)}
-        isAIAssistantOpen={isAIAssistantOpen}
-      />
-      
-      <div className="flex-1 flex overflow-hidden">
+    <AppShell
+      appId="studio"
+      headerActions={
+        <Button
+          onClick={() => setIsAIAssistantOpen(!isAIAssistantOpen)}
+          variant={isAIAssistantOpen ? "default" : "outline"}
+          className="gap-2"
+        >
+          <Bot className="w-5 h-5" />
+          AI Assistant
+        </Button>
+      }
+    >
+      <div className="h-full flex overflow-hidden">
         <AgentPalette onTalkToAI={() => setIsAIAssistantOpen(true)} />
         
         <div ref={reactFlowWrapper} className="flex-1">
@@ -338,6 +357,7 @@ function FlowOneApp() {
             onConnect={onConnect}
             onDrop={onDrop}
             onDragOver={onDragOver}
+            activeEdgeId={activeEdgeId}
           />
           <div className="p-3 flex gap-2 items-center">
             <button className="px-3 py-1 border rounded" onClick={saveFlow}>Save Flow</button>
@@ -403,7 +423,7 @@ function FlowOneApp() {
           trace: {traceId}
         </div>
       )}
-    </div>
+    </AppShell>
   );
 }
 

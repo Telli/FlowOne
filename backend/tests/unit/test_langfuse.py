@@ -2,7 +2,7 @@
 import pytest
 from unittest.mock import patch, MagicMock
 
-from backend.observability.langfuse import trace_event
+from observability.langfuse import trace_event
 
 
 class TestLangfuse:
@@ -23,7 +23,7 @@ class TestLangfuse:
         
         assert trace_id == custom_id
 
-    @patch("backend.observability.langfuse._lf")
+    @patch("observability.langfuse._lf")
     def test_trace_event_calls_langfuse_when_available(self, mock_lf):
         """Test that trace_event calls Langfuse client when configured."""
         mock_lf.event = MagicMock()
@@ -38,7 +38,7 @@ class TestLangfuse:
 
     def test_trace_event_fail_open_on_error(self):
         """Test that trace_event doesn't raise on Langfuse error."""
-        with patch("backend.observability.langfuse._lf") as mock_lf:
+        with patch("observability.langfuse._lf") as mock_lf:
             mock_lf.event.side_effect = Exception("Langfuse error")
             
             # Should not raise

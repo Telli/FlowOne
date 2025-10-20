@@ -1,13 +1,13 @@
 from fastapi import APIRouter
-from backend.settings import get_settings
-from backend.memory.store import get_engine
-from backend.observability.langfuse import trace_event
+from settings import get_settings
+from memory.store import get_engine
+from observability.langfuse import trace_event
 
 router = APIRouter()
 
 
 @router.get("/live")
-def live():
+def health_live():
     trace_id = trace_event("health.live")
     return {"ok": True, "trace_id": trace_id}
 

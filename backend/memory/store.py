@@ -3,7 +3,7 @@ import json
 from datetime import datetime
 from sqlmodel import SQLModel, Field, Session, create_engine, select
 
-from backend.settings import get_settings
+from settings import get_settings
 
 
 settings = get_settings()
@@ -18,13 +18,29 @@ class Agent(SQLModel, table=True):
     id: str = Field(primary_key=True)
     name: str
     card_json: str
+    avatar_replica_id: Optional[str] = None
+    avatar_thumbnail_url: Optional[str] = None
 
     def to_card(self) -> Dict[str, Any]:
-        return json.loads(self.card_json)
+        card = json.loads(self.card_json)
+        if self.avatar_replica_id:
+            card["avatar"] = {
+                "replicaId": self.avatar_replica_id,
+                "thumbnailUrl": self.avatar_thumbnail_url or ""
+            }
+        return card
 
     @staticmethod
     def from_card(card: Dict[str, Any]) -> "Agent":
-        return Agent(id=card["id"], name=card.get("name", card["id"]), card_json=json.dumps(card))
+        avatar_data = card.pop("avatar", None) if isinstance(card, dict) else None
+        agent = Agent(
+            id=card["id"],
+            name=card.get("name", card["id"]),
+            card_json=json.dumps(card),
+            avatar_replica_id=avatar_data.get("replicaId") if avatar_data else None,
+            avatar_thumbnail_url=avatar_data.get("thumbnailUrl") if avatar_data else None
+        )
+        return agent
 
 
 class SessionRow(SQLModel, table=True):
@@ -77,6 +93,15 @@ class Template(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
+class Avatar(SQLModel, table=True):
+    id: str = Field(primary_key=True)
+    replica_id: str  # Tavus replica ID
+    name: str
+    thumbnail_url: Optional[str] = None
+    video_url: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 def create_db(engine):
     SQLModel.metadata.create_all(engine)
 
@@ -87,6 +112,8 @@ def upsert_agent(agent: Agent):
         if existing:
             existing.name = agent.name
             existing.card_json = agent.card_json
+            existing.avatar_replica_id = agent.avatar_replica_id
+            existing.avatar_thumbnail_url = agent.avatar_thumbnail_url
         else:
             s.add(agent)
         s.commit()
@@ -134,11 +161,14 @@ def upsert_flow_graph(flow_id: str, nodes: List[Dict[str, Any]], edges: List[Dic
         flow = s.get(Flow, flow_id)
         if not flow:
             return False
-        # delete existing
-        s.exec(select(FlowNode).where(FlowNode.flow_id == flow_id))
-        s.exec(select(FlowEdge).where(FlowEdge.flow_id == flow_id))
-        s.query(FlowNode).filter(FlowNode.flow_id == flow_id).delete()
-        s.query(FlowEdge).filter(FlowEdge.flow_id == flow_id).delete()
+        # delete existing using SQLModel/SQLAlchemy 2.x syntax
+        existing_nodes = s.exec(select(FlowNode).where(FlowNode.flow_id == flow_id)).all()
+        for node in existing_nodes:
+            s.delete(node)
+        existing_edges = s.exec(select(FlowEdge).where(FlowEdge.flow_id == flow_id)).all()
+        for edge in existing_edges:
+            s.delete(edge)
+        
         # add new
         for n in nodes:
             s.add(FlowNode(

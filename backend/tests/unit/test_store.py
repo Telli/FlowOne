@@ -2,7 +2,7 @@
 import pytest
 from sqlmodel import Session, select
 
-from backend.memory.store import (
+from memory.store import (
     Agent,
     SessionRow,
     Flow,
@@ -40,7 +40,7 @@ class TestStore:
         }
         agent = Agent.from_card(agent_card)
         
-        with patch("backend.memory.store._engine", test_db_engine):
+        with patch("memory.store._engine", test_db_engine):
             upsert_agent(agent)
             
             # Read agent
@@ -59,7 +59,7 @@ class TestStore:
 
     def test_session_creation(self, test_db_engine):
         """Test session creation."""
-        with patch("backend.memory.store._engine", test_db_engine):
+        with patch("memory.store._engine", test_db_engine):
             session_id = create_session("test_agent")
             
             assert session_id is not None
@@ -74,7 +74,7 @@ class TestStore:
 
     def test_message_storage(self, test_db_engine):
         """Test message creation and storage."""
-        with patch("backend.memory.store._engine", test_db_engine):
+        with patch("memory.store._engine", test_db_engine):
             session_id = create_session("test_agent")
             msg_id = add_message(session_id, "user", "Hello")
             
@@ -90,7 +90,7 @@ class TestStore:
 
     def test_flow_crud(self, test_db_engine):
         """Test flow CRUD operations."""
-        with patch("backend.memory.store._engine", test_db_engine):
+        with patch("memory.store._engine", test_db_engine):
             # Create flow
             flow_id = create_flow("Test Flow")
             assert flow_id is not None
@@ -102,7 +102,7 @@ class TestStore:
 
     def test_flow_graph_persistence(self, test_db_engine):
         """Test flow graph nodes and edges persistence."""
-        with patch("backend.memory.store._engine", test_db_engine):
+        with patch("memory.store._engine", test_db_engine):
             flow_id = create_flow("Test Flow")
             
             nodes = [
@@ -125,7 +125,7 @@ class TestStore:
 
     def test_flow_versioning(self, test_db_engine):
         """Test flow version management."""
-        with patch("backend.memory.store._engine", test_db_engine):
+        with patch("memory.store._engine", test_db_engine):
             flow_id = create_flow("Test Flow")
             
             graph = {"nodes": [], "edges": []}
@@ -139,7 +139,7 @@ class TestStore:
 
     def test_template_management(self, test_db_engine):
         """Test template CRUD operations."""
-        with patch("backend.memory.store._engine", test_db_engine):
+        with patch("memory.store._engine", test_db_engine):
             # Seed defaults
             seed_default_templates()
             

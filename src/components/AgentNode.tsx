@@ -5,10 +5,10 @@ import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Input } from './ui/input';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { getAgentIcon } from '../lib/agentIcons';
 
-export interface AgentNodeData {
+export interface AgentNodeData extends Record<string, unknown> {
   id: string;
   name: string;
   type: string;
@@ -18,6 +18,7 @@ export interface AgentNodeData {
   status: 'draft' | 'ai-configured' | 'testing' | 'error';
   updatedAt: string;
   isFlashing?: boolean;
+  avatarThumbnailUrl?: string;
   onModify: (id: string) => void;
   onTest: (id: string) => void;
   onChat: (id: string, message: string) => void;
@@ -81,6 +82,14 @@ export const AgentNode = memo(({ data }: NodeProps<AgentNodeData>) => {
               <IconComponent className="w-4 h-4 text-primary" />
             </div>
             <span className="font-medium truncate">{data.name}</span>
+            {data.avatarThumbnailUrl && (
+              <img
+                src={data.avatarThumbnailUrl}
+                alt="Avatar"
+                className="w-6 h-6 rounded-full ml-auto shrink-0"
+                title="Avatar"
+              />
+            )}
           </div>
           <div className="flex items-center gap-1 shrink-0">
             <Button 

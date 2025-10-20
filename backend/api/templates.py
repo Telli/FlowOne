@@ -2,8 +2,8 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
 
-from backend.memory.store import list_templates, upsert_template, delete_template, seed_default_templates
-from backend.observability.langfuse import trace_event
+from memory.store import list_templates, upsert_template, delete_template, seed_default_templates
+from observability.langfuse import trace_event
 
 
 router = APIRouter()

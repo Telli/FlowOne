@@ -107,24 +107,20 @@ export async function nlpCommands(text: string): Promise<{ action: string; confi
 
 // Flows
 export async function createFlow(name: string): Promise<{ flowId: string; trace_id?: string }> {
-  const res = await fetch(`${API_URL}/flows`, {
+  const json = await fetchJson(`${API_URL}/flows`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name })
   });
-  if (!res.ok) throw new Error(`createFlow failed: ${res.status}`);
-  const json = await res.json();
   return { flowId: json.flowId as string, trace_id: json.trace_id };
 }
 
 export async function putFlow(flowId: string, graph: { nodes: any[]; edges: any[] }): Promise<string | undefined> {
-  const res = await fetch(`${API_URL}/flows/${flowId}`, {
+  const json = await fetchJson(`${API_URL}/flows/${flowId}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(graph)
   });
-  if (!res.ok) throw new Error(`putFlow failed: ${res.status}`);
-  const json = await res.json();
 
   // Invalidate cache for this flow and flows list
   cache.delete(`flow:${flowId}`);
@@ -140,9 +136,7 @@ export async function getFlow(flowId: string): Promise<{ nodes: any[]; edges: an
   const cached = cache.get(cacheKey);
   if (cached) return cached;
 
-  const res = await fetch(`${API_URL}/flows/${flowId}`);
-  if (!res.ok) throw new Error(`getFlow failed: ${res.status}`);
-  const data = await res.json();
+  const data = await fetchJson(`${API_URL}/flows/${flowId}`);
 
   // Cache the result
   cache.set(cacheKey, data, CACHE_TTL.FLOWS);
@@ -156,9 +150,7 @@ export async function listFlows(): Promise<{ id: string; name: string; updated_a
   const cached = cache.get(cacheKey);
   if (cached) return cached;
 
-  const res = await fetch(`${API_URL}/flows`);
-  if (!res.ok) throw new Error(`listFlows failed: ${res.status}`);
-  const json = await res.json();
+  const json = await fetchJson(`${API_URL}/flows`);
   const flows = json.flows as any;
 
   // Cache the result
@@ -175,9 +167,7 @@ export async function getTemplates(): Promise<TemplateItem[]>{
   const cached = cache.get(cacheKey);
   if (cached) return cached;
 
-  const res = await fetch(`${API_URL}/templates`);
-  if (!res.ok) throw new Error(`getTemplates failed: ${res.status}`);
-  const json = await res.json();
+  const json = await fetchJson(`${API_URL}/templates`);
   const templates = json.templates as TemplateItem[];
 
   // Cache the result (templates rarely change)
@@ -187,13 +177,11 @@ export async function getTemplates(): Promise<TemplateItem[]>{
 
 // Agents
 export async function patchAgent(agentId: string, patch: { role?: string; goals?: string[]; tone?: string; style?: any }): Promise<string | undefined> {
-  const res = await fetch(`${API_URL}/agents/${agentId}`, {
+  const json = await fetchJson(`${API_URL}/agents/${agentId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(patch)
   });
-  if (!res.ok) throw new Error(`patchAgent failed: ${res.status}`);
-  const json = await res.json();
 
   // Invalidate cache for this agent
   cache.delete(`agent:${agentId}`);

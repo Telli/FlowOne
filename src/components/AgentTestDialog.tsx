@@ -14,6 +14,8 @@ import { Slider } from "./ui/slider";
 import { Badge } from "./ui/badge";
 
 import { useToast } from "./ui/use-toast";
+import { useSessionStore } from "../store/sessionStore";
+
 
 interface Message {
   id: string;
@@ -58,6 +60,7 @@ export function AgentTestDialog({ open, onOpenChange, agent }: AgentTestDialogPr
   });
 
   const { toast } = useToast();
+  const { addWsEvent } = useSessionStore();
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -86,8 +89,10 @@ export function AgentTestDialog({ open, onOpenChange, agent }: AgentTestDialogPr
           try {
             const ev = JSON.parse(msg.data);
 
-            // Add to WS event log
-            setWsEvents((events) => [...events.slice(-19), { type: ev.type, data: ev, timestamp: new Date() }]);
+            // Add to WS event logs (local + global)
+            const logItem = { type: ev.type, data: ev, timestamp: new Date() };
+            setWsEvents((events) => [...events.slice(-19), logItem]);
+            addWsEvent({ type: ev.type, data: ev, timestamp: Date.now() });
 
             // Track trace_id
             if (ev.trace_id || ev.traceId) {

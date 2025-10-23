@@ -2,6 +2,7 @@ from typing import Optional, Dict, Any, List
 import json
 from datetime import datetime
 from sqlmodel import SQLModel, Field, Session, create_engine, select
+from sqlalchemy import text
 
 from settings import get_settings
 
@@ -20,13 +21,15 @@ class Agent(SQLModel, table=True):
     card_json: str
     avatar_replica_id: Optional[str] = None
     avatar_thumbnail_url: Optional[str] = None
+    tavus_persona_id: Optional[str] = None  # Tavus persona ID for Phoenix REST mode
 
     def to_card(self) -> Dict[str, Any]:
         card = json.loads(self.card_json)
         if self.avatar_replica_id:
             card["avatar"] = {
                 "replicaId": self.avatar_replica_id,
-                "thumbnailUrl": self.avatar_thumbnail_url or ""
+                "thumbnailUrl": self.avatar_thumbnail_url or "",
+                "tavusPersonaId": self.tavus_persona_id or ""
             }
         return card
 
@@ -38,7 +41,8 @@ class Agent(SQLModel, table=True):
             name=card.get("name", card["id"]),
             card_json=json.dumps(card),
             avatar_replica_id=avatar_data.get("replicaId") if avatar_data else None,
-            avatar_thumbnail_url=avatar_data.get("thumbnailUrl") if avatar_data else None
+            avatar_thumbnail_url=avatar_data.get("thumbnailUrl") if avatar_data else None,
+            tavus_persona_id=avatar_data.get("tavusPersonaId") if avatar_data else None
         )
         return agent
 
@@ -103,7 +107,23 @@ class Avatar(SQLModel, table=True):
 
 
 def create_db(engine):
+    """Create database tables and run migrations."""
     SQLModel.metadata.create_all(engine)
+
+    # Migration: Add tavus_persona_id column if it doesn't exist
+    try:
+        with Session(engine) as session:
+            # Try to query the column - if it fails, we need to add it
+            try:
+                session.exec(text("SELECT tavus_persona_id FROM agent LIMIT 1"))
+            except Exception:
+                # Column doesn't exist, add it
+                session.exec(text("ALTER TABLE agent ADD COLUMN tavus_persona_id VARCHAR"))
+                session.commit()
+                print("✓ Migration: Added tavus_persona_id column to agent table")
+    except Exception as e:
+        # Ignore migration errors (e.g., if table doesn't exist yet)
+        pass
 
 
 def upsert_agent(agent: Agent):
@@ -114,6 +134,7 @@ def upsert_agent(agent: Agent):
             existing.card_json = agent.card_json
             existing.avatar_replica_id = agent.avatar_replica_id
             existing.avatar_thumbnail_url = agent.avatar_thumbnail_url
+            existing.tavus_persona_id = agent.tavus_persona_id
         else:
             s.add(agent)
         s.commit()

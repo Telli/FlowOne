@@ -120,11 +120,13 @@ class Session:
     async def _start_avatar_stream(self, room: Optional[str] = None):
         """Start Tavus Phoenix session for avatar streaming."""
         try:
-            # Get avatar replica ID from agent card or use default
+            # Get avatar replica ID and persona ID from agent card or use defaults
+            avatar_data = self.agent.get("avatar", {})
             replica_id = (
-                self.agent.get("avatar", {}).get("replicaId")
+                avatar_data.get("replicaId")
                 or self.settings.TAVUS_DEFAULT_REPLICA_ID
             )
+            persona_id = avatar_data.get("tavusPersonaId")
 
             # Check if we have a valid replica ID
             if not replica_id or replica_id == "default":
@@ -192,7 +194,7 @@ class Session:
                     return
 
             # Phoenix REST path (legacy)
-            # Tavus Phoenix API requires a valid audio stream URL
+            # Tavus Phoenix API requires a valid audio stream URL and persona_id
             if mode == "phoenix_rest":
                 if room:
                     audio_stream_url = f"https://{self.settings.DAILY_SUBDOMAIN}.daily.co/{room}"
@@ -209,9 +211,24 @@ class Session:
                     })
                     return
 
+                # Check if persona_id is configured
+                if not persona_id:
+                    trace_event(
+                        "avatar.error",
+                        sessionId=self.id,
+                        error="No Tavus persona ID configured for Phoenix REST mode"
+                    )
+                    await self.queue.put({
+                        "type": "avatar.error",
+                        "error": "Phoenix REST mode requires a Tavus persona ID. Please configure tavusPersonaId in the agent's avatar settings.",
+                        "sessionId": self.id
+                    })
+                    return
+
                 result = await self.tavus_client.start_phoenix_session(
                     replica_id=replica_id,
                     audio_stream_url=audio_stream_url,
+                    persona_id=persona_id,
                     enable_vision=False
                 )
             else:

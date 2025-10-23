@@ -21,6 +21,7 @@ class CreateAgentRequest(BaseModel):
     goals: list[str] = []
     tone: str = "neutral"
     avatarReplicaId: str | None = None
+    tavusPersonaId: str | None = None
 
 class PatchAgentRequest(BaseModel):
     role: str | None = None
@@ -28,6 +29,7 @@ class PatchAgentRequest(BaseModel):
     tone: str | None = None
     style: dict | None = None
     avatarReplicaId: str | None = None
+    tavusPersonaId: str | None = None
 
 
 # Database initialization moved to app.py startup event
@@ -39,24 +41,27 @@ def create_agent(body: CreateAgentRequest):
     card = synthesize_agent_card(
         name=body.name, role=body.role, goals=body.goals, tone=body.tone
     )
-    
+
     # Get agent ID from card before creating Agent object
     agent_id = card["id"]
-    
+
     agent = Agent.from_card(card)
     if body.avatarReplicaId:
         agent.avatar_replica_id = body.avatarReplicaId
-    
+    if body.tavusPersonaId:
+        agent.tavus_persona_id = body.tavusPersonaId
+
     upsert_agent(agent)
-    
+
     # Build response card after upsert (include avatar data if present)
     response_card = dict(card)
-    if body.avatarReplicaId:
+    if body.avatarReplicaId or body.tavusPersonaId:
         response_card["avatar"] = {
-            "replicaId": body.avatarReplicaId,
-            "thumbnailUrl": ""
+            "replicaId": body.avatarReplicaId or "",
+            "thumbnailUrl": "",
+            "tavusPersonaId": body.tavusPersonaId or ""
         }
-    
+
     trace_id = trace_event("agent.create", agentId=agent_id)
     return {"agent": response_card, "trace_id": trace_id}
 
@@ -89,6 +94,8 @@ def patch_agent(agent_id: str, body: PatchAgentRequest):
     updated_agent = Agent.from_card(card)
     if body.avatarReplicaId is not None:
         updated_agent.avatar_replica_id = body.avatarReplicaId
+    if body.tavusPersonaId is not None:
+        updated_agent.tavus_persona_id = body.tavusPersonaId
     upsert_agent(updated_agent)
     trace_id = trace_event("agent.patch", agentId=agent_id)
     return {"agent": updated_agent.to_card(), "trace_id": trace_id}

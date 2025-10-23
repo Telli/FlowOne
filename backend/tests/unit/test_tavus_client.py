@@ -33,7 +33,8 @@ class TestTavusClient:
             with patch("backend.services.tavus_client.httpx.AsyncClient", return_value=mock_async_client):
                 result = await tavus_client.start_phoenix_session(
                     replica_id="replica_123",
-                    audio_stream_url="https://daily.co/rooms/test"
+                    audio_stream_url="https://daily.co/rooms/test",
+                    persona_id="persona_123"
                 )
 
             assert result["error"] is None
@@ -46,7 +47,8 @@ class TestTavusClient:
         tavus_client.api_key = ""
         result = await tavus_client.start_phoenix_session(
             replica_id="replica_123",
-            audio_stream_url="https://daily.co/rooms/test"
+            audio_stream_url="https://daily.co/rooms/test",
+            persona_id="persona_123"
         )
 
         assert result["error"] is not None
@@ -68,7 +70,8 @@ class TestTavusClient:
             with patch("backend.services.tavus_client.httpx.AsyncClient", return_value=mock_async_client):
                 result = await tavus_client.start_phoenix_session(
                     replica_id="invalid_replica",
-                    audio_stream_url="https://daily.co/rooms/test"
+                    audio_stream_url="https://daily.co/rooms/test",
+                    persona_id="persona_123"
                 )
 
             assert result["error"] is not None

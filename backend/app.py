@@ -16,7 +16,7 @@ load_dotenv()
 
 from settings import get_settings
 from api import agents, sessions, voice
-from api import flows, templates, nlp, health, avatars, metrics, multi_agent, suggestions
+from api import flows, templates, nlp, health, avatars, metrics, multi_agent, suggestions, personas
 
 
 app = FastAPI(
@@ -130,8 +130,9 @@ app.include_router(metrics.router, prefix="/metrics", tags=["metrics"])
 # Multi-agent coordination
 app.include_router(multi_agent.router, prefix="/multi-agent", tags=["multi-agent"])
 
-# Avatars
+# Avatars and Personas
 app.include_router(avatars.router, prefix="/avatars", tags=["avatars"])
+app.include_router(personas.router, prefix="/personas", tags=["personas"])
 
 
 

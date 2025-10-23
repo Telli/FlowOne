@@ -16,6 +16,8 @@ import { Badge } from "./ui/badge";
 import { useToast } from "./ui/use-toast";
 import { useSessionStore } from "../store/sessionStore";
 
+import DailyIframe from "@daily-co/daily-js";
+
 
 interface Message {
   id: string;
@@ -46,6 +48,23 @@ export function AgentTestDialog({ open, onOpenChange, agent }: AgentTestDialogPr
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const [enableAvatar, setEnableAvatar] = useState(true);
   const [sessionStarted, setSessionStarted] = useState(false);
+  const avatarVideoRef = useRef<HTMLVideoElement | null>(null);
+  const [avatarMediaStream, setAvatarMediaStream] = useState<MediaStream | null>(null);
+  const dailyCallRef = useRef<any>(null);
+
+  useEffect(() => {
+    const el = avatarVideoRef.current as any;
+    if (!el) return;
+    try {
+      if (avatarMediaStream) {
+        el.srcObject = avatarMediaStream;
+        el.play?.().catch(() => {});
+      } else {
+        el.srcObject = null;
+      }
+    } catch {}
+  }, [avatarMediaStream]);
+
   const [wsEvents, setWsEvents] = useState<{type: string; data: any; timestamp: Date}[]>([]);
 
   // Persona controls
@@ -172,10 +191,19 @@ export function AgentTestDialog({ open, onOpenChange, agent }: AgentTestDialogPr
               ]);
             } else if (ev.type === "avatar.started") {
               const videoUrl = ev.videoStreamUrl || ev.video_stream_url || null;
-              console.log("[Avatar] Stream started:", videoUrl);
-              setAvatarStreamUrl(videoUrl);
-              setAvatarLoading(false);
-              setAvatarError(null);
+              const roomUrl = ev.dailyRoomUrl || null;
+              if (videoUrl) {
+                console.log("[Avatar] Stream started (Phoenix):", videoUrl);
+                setAvatarStreamUrl(videoUrl);
+                setAvatarMediaStream(null);
+                setAvatarLoading(false);
+                setAvatarError(null);
+              } else if (roomUrl) {
+                console.log("[Avatar] Joining Daily room (Pipecat):", roomUrl);
+                setAvatarStreamUrl(null);
+                setAvatarError(null);
+                void joinDailyRoomAndAttachVideo(roomUrl);
+              }
             } else if (ev.type === "avatar.error") {
               const errorMsg = ev.error || "Unknown avatar error";
               console.warn("[Avatar] Error:", errorMsg);
@@ -211,6 +239,10 @@ export function AgentTestDialog({ open, onOpenChange, agent }: AgentTestDialogPr
       setWsConnected(false);
       clearWsEvents();
       setSessionId(null);
+      try { dailyCallRef.current?.leave?.(); } catch {}
+      try { dailyCallRef.current?.destroy?.(); } catch {}
+      dailyCallRef.current = null;
+      setAvatarMediaStream(null);
 
     };
   }, [open, enableAvatar]);
@@ -254,6 +286,45 @@ export function AgentTestDialog({ open, onOpenChange, agent }: AgentTestDialogPr
       setIsTyping(false);
     }
   };
+  const joinDailyRoomAndAttachVideo = async (roomUrl: string) => {
+    try {
+      setAvatarLoading(true);
+      setAvatarError(null);
+      setAvatarMediaStream(null);
+      // Clean up any existing call
+      if (dailyCallRef.current) {
+        try { await dailyCallRef.current.leave(); } catch {}
+        try { await dailyCallRef.current.destroy(); } catch {}
+        dailyCallRef.current = null;
+      }
+      const call = (DailyIframe as any).createCallObject({ subscribeToTracksAutomatically: true });
+      dailyCallRef.current = call;
+
+      call.on('track-started', (ev: any) => {
+        try {
+          const track = ev?.track;
+          if (track && track.kind === 'video') {
+            const ms = new MediaStream([track]);
+            setAvatarMediaStream(ms);
+            setAvatarLoading(false);
+          }
+        } catch {}
+      });
+      call.on('track-stopped', (ev: any) => {
+        const track = ev?.track;
+        if (track && track.kind === 'video') {
+          setAvatarMediaStream(null);
+        }
+      });
+
+      await call.join({ url: roomUrl, audioSource: false, videoSource: false });
+    } catch (e: any) {
+      console.error('[Avatar] Daily join failed:', e);
+      setAvatarError(e?.message || 'Failed to join Daily room');
+      setAvatarLoading(false);
+    }
+  };
+
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -366,6 +437,7 @@ export function AgentTestDialog({ open, onOpenChange, agent }: AgentTestDialogPr
                 <Slider
                   value={[brevity]}
                   onValueChange={(val) => setBrevity(val[0])}
+
                   min={0}
                   max={100}
                   step={10}
@@ -404,7 +476,7 @@ export function AgentTestDialog({ open, onOpenChange, agent }: AgentTestDialogPr
         )}
 
         {/* Messages */}
-        <ScrollArea className="flex-1 pr-4">
+        <ScrollArea className="flex-1 min-h-0 pr-4">
           <div ref={scrollRef} className="space-y-4">
             {/* Avatar Stream Display */}
             {avatarStreamUrl && (
@@ -429,6 +501,7 @@ export function AgentTestDialog({ open, onOpenChange, agent }: AgentTestDialogPr
                     }}
                     onLoadedData={() => {
                       console.log("[Avatar] Video loaded successfully");
+
                     }}
                     onPlay={() => {
                       console.log("[Avatar] Video playback started");
@@ -437,7 +510,31 @@ export function AgentTestDialog({ open, onOpenChange, agent }: AgentTestDialogPr
                 </div>
               </div>
             )}
+            {avatarMediaStream && !avatarStreamUrl && (
+              <div className="mb-4 flex justify-center">
+                <div className="w-full max-w-md">
+                  <div className="text-xs text-muted-foreground mb-2 text-center flex items-center justify-center gap-2">
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                    <span>Avatar Live</span>
+                  </div>
+                  <video
+                    ref={avatarVideoRef}
+                    autoPlay
+                    playsInline
+                    muted={false}
+                    className="w-full h-auto aspect-video bg-black rounded-lg shadow-lg border-2 border-purple-500/30"
+                    onError={(e) => {
+                      console.error("[Avatar] Daily video element error:", e);
+                      setAvatarError("Failed to play Daily stream");
+                      setAvatarMediaStream(null);
+                    }}
+                  />
+                </div>
+              </div>
+            )}
             {avatarLoading && !avatarError && !avatarStreamUrl && (
+
+
               <div className="mb-4 flex justify-center">
                 <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 max-w-md">
                   <div className="flex items-center gap-3">
@@ -458,6 +555,7 @@ export function AgentTestDialog({ open, onOpenChange, agent }: AgentTestDialogPr
                     <div>
                       <div className="font-medium text-amber-900 mb-1">Avatar Unavailable</div>
                       <div className="text-xs text-amber-700">{avatarError}</div>
+
                       <div className="text-xs text-amber-600 mt-2">Text chat is still available below.</div>
                     </div>
                   </div>
@@ -489,7 +587,7 @@ export function AgentTestDialog({ open, onOpenChange, agent }: AgentTestDialogPr
                         ? 'bg-primary text-primary-foreground'
                         : 'bg-muted'
                     }`}>
-                      <div className="text-sm">{message.content}</div>
+                      <div className="text-sm break-words whitespace-pre-wrap">{message.content}</div>
                       <div className={`text-xs mt-1 ${
                         message.role === 'user'
                           ? 'text-primary-foreground/70'

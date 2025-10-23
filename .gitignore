@@ -49,3 +49,9 @@ venv.bak/
 # Test files
 test_*.py
 *_test.py
+
+# Coverage artifacts
+backend/.coverage
+
+# Windows special file accidentally created
+/nul

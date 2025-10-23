@@ -9,9 +9,12 @@ class TavusClient:
     
     def __init__(self):
         self.settings = get_settings()
-        self.base_url = "https://api.tavus.io/v2"
+        # Derive and normalize base URL with readable steps
+        base_url_setting = getattr(self.settings, "TAVUS_BASE_URL", "https://tavusapi.com/v2")
+        base_url_value = base_url_setting or "https://tavusapi.com/v2"
+        self.base_url = base_url_value.rstrip("/")
         self.api_key = self.settings.TAVUS_API_KEY
-    
+
     async def start_phoenix_session(
         self,
         replica_id: str,
@@ -20,23 +23,34 @@ class TavusClient:
     ) -> Dict[str, Any]:
         """
         Start a Tavus Phoenix session for real-time avatar generation.
-        
+
         Args:
             replica_id: Tavus replica ID
             audio_stream_url: URL or stream endpoint for audio input
             enable_vision: Whether to enable vision input (default: False for audio-only)
-        
+
         Returns:
             Dict with session_id, video_stream_url, and status
         """
-        if not self.api_key:
+        if not self.api_key or self.api_key == "your_tavus_api_key_here":
+            print("WARNING: TAVUS_API_KEY not configured")
             return {
                 "error": "TAVUS_API_KEY not configured",
                 "session_id": None,
                 "video_stream_url": None
             }
-        
+
         try:
+            payload = {
+                "replica_id": replica_id,
+                "stream_input": {
+                    "audio_url": audio_stream_url
+                },
+                "enable_vision": enable_vision
+            }
+
+            print(f"[Tavus] Starting Phoenix session with replica_id={replica_id}, audio_url={audio_stream_url}")
+
             async with httpx.AsyncClient() as client:
                 response = await client.post(
                     f"{self.base_url}/phoenix",
@@ -44,32 +58,41 @@ class TavusClient:
                         "x-api-key": self.api_key,
                         "Content-Type": "application/json"
                     },
-                    json={
-                        "replica_id": replica_id,
-                        "stream_input": {
-                            "audio_url": audio_stream_url
-                        },
-                        "enable_vision": enable_vision
-                    },
+                    json=payload,
                     timeout=30.0
                 )
-                
+
                 if response.status_code not in (200, 201):
+                    error_detail = response.text
+                    print(f"[Tavus] API error {response.status_code}: {error_detail}")
                     return {
                         "error": f"Tavus API error: {response.status_code}",
                         "session_id": None,
                         "video_stream_url": None,
-                        "details": response.text
+                        "details": error_detail
                     }
-                
+
                 data = response.json()
+                video_url = data.get("video_stream_url")
+                session_id = data.get("session_id")
+
+                print(f"[Tavus] Phoenix session started: session_id={session_id}, video_url={video_url}")
+
                 return {
                     "error": None,
-                    "session_id": data.get("session_id"),
-                    "video_stream_url": data.get("video_stream_url"),
+                    "session_id": session_id,
+                    "video_stream_url": video_url,
                     "status": data.get("status", "started")
                 }
+        except httpx.TimeoutException as e:
+            print(f"[Tavus] Timeout error: {str(e)}")
+            return {
+                "error": f"Tavus API timeout: {str(e)}",
+                "session_id": None,
+                "video_stream_url": None
+            }
         except Exception as e:
+            print(f"[Tavus] Unexpected error: {str(e)}")
             return {
                 "error": f"Failed to start Tavus session: {str(e)}",
                 "session_id": None,

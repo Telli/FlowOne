@@ -30,7 +30,7 @@ class FlowGraph(BaseModel):
 @router.post("")
 def create_flow_ep(body: CreateFlowRequest):
     fid = create_flow(body.name)
-    trace_id = trace_event("flow.create", flowId=fid, name=body.name)
+    trace_id = trace_event("flow.create", flowId=fid, flowName=body.name)
     return {"flowId": fid, "trace_id": trace_id}
 
 

@@ -171,14 +171,16 @@ def upsert_flow_graph(flow_id: str, nodes: List[Dict[str, Any]], edges: List[Dic
         
         # add new
         for n in nodes:
+            store_id = f"{flow_id}:{n.get('id')}"
             s.add(FlowNode(
-                id=n.get("id"), flow_id=flow_id, agent_id=n.get("agent_id"),
+                id=store_id, flow_id=flow_id, agent_id=n.get("agent_id"),
                 label=n.get("label"), position_json=json.dumps(n.get("position", {})),
                 data_json=json.dumps(n.get("data", {}))
             ))
         for e in edges:
+            store_id = f"{flow_id}:{e.get('id')}"
             s.add(FlowEdge(
-                id=e.get("id"), flow_id=flow_id, source_node_id=e.get("source"),
+                id=store_id, flow_id=flow_id, source_node_id=e.get("source"),
                 target_node_id=e.get("target"), label=e.get("label"),
                 data_json=json.dumps(e.get("data", {}))
             ))
@@ -191,14 +193,18 @@ def list_flow_nodes_edges(flow_id: str) -> Dict[str, Any]:
         nodes = s.exec(select(FlowNode).where(FlowNode.flow_id == flow_id)).all()
         edges = s.exec(select(FlowEdge).where(FlowEdge.flow_id == flow_id)).all()
         def node_to_dict(n: FlowNode):
+            raw_id = n.id or ""
+            rid = raw_id.split(":", 1)[1] if ":" in raw_id else raw_id
             return {
-                "id": n.id, "agent_id": n.agent_id, "label": n.label,
+                "id": rid, "agent_id": n.agent_id, "label": n.label,
                 "position": json.loads(n.position_json or "{}"),
                 "data": json.loads(n.data_json or "{}"),
             }
         def edge_to_dict(e: FlowEdge):
+            raw_id = e.id or ""
+            rid = raw_id.split(":", 1)[1] if ":" in raw_id else raw_id
             return {
-                "id": e.id, "source": e.source_node_id, "target": e.target_node_id,
+                "id": rid, "source": e.source_node_id, "target": e.target_node_id,
                 "label": e.label, "data": json.loads(e.data_json or "{}"),
             }
         return {"nodes": [node_to_dict(n) for n in nodes], "edges": [edge_to_dict(e) for e in edges]}

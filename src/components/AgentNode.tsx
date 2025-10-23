@@ -1,6 +1,6 @@
-import { memo, useState } from 'react';
+import { memo, useState, useRef, useEffect } from 'react';
 import { Handle, Position, NodeProps } from '@xyflow/react';
-import { MessageCircle, Play, MoreVertical, Zap, Send, Mic, X, User, Bot } from 'lucide-react';
+import { MessageCircle, Play, MoreVertical, Settings, Zap, Send, Mic, X, User, Bot, MicOff } from 'lucide-react';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -22,6 +22,7 @@ export interface AgentNodeData extends Record<string, unknown> {
   onModify: (id: string) => void;
   onTest: (id: string) => void;
   onChat: (id: string, message: string) => void;
+  onConfigure?: (id: string) => void;
 }
 
 const statusConfig = {
@@ -36,7 +37,62 @@ export const AgentNode = memo(({ data }: NodeProps<AgentNodeData>) => {
   const [showChat, setShowChat] = useState(false);
   const [chatMessage, setChatMessage] = useState('');
   const [isListening, setIsListening] = useState(false);
+  const [interimTranscript, setInterimTranscript] = useState('');
+  const recognitionRef = useRef<any>(null);
   const IconComponent = getAgentIcon(data.type);
+
+  // Initialize Web Speech API
+  useEffect(() => {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      return;
+    }
+
+    const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+    recognitionRef.current = new SpeechRecognition();
+    recognitionRef.current.continuous = false;
+    recognitionRef.current.interimResults = true;
+    recognitionRef.current.lang = 'en-US';
+
+    recognitionRef.current.onstart = () => {
+      console.log('[Voice] Started listening');
+      setIsListening(true);
+    };
+
+    recognitionRef.current.onresult = (event: any) => {
+      let interim = '';
+      let final = '';
+
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcriptText = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          final += transcriptText;
+        } else {
+          interim += transcriptText;
+        }
+      }
+
+      setInterimTranscript(interim);
+      if (final) {
+        setChatMessage(final);
+      }
+    };
+
+    recognitionRef.current.onend = () => {
+      console.log('[Voice] Stopped listening');
+      setIsListening(false);
+    };
+
+    recognitionRef.current.onerror = (event: any) => {
+      console.error('[Voice] Error:', event.error);
+      setIsListening(false);
+    };
+
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    };
+  }, []);
 
   const handleSendMessage = () => {
     if (chatMessage.trim()) {
@@ -47,9 +103,19 @@ export const AgentNode = memo(({ data }: NodeProps<AgentNodeData>) => {
   };
 
   const handleVoiceInput = () => {
-    setIsListening(!isListening);
-    // In production, this would use Web Speech API
-    // For now, just toggle the state
+    if (!recognitionRef.current) {
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current.stop();
+    } else {
+      try {
+        recognitionRef.current.start();
+      } catch (error) {
+        console.error('[Voice] Start error:', error);
+      }
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -92,14 +158,25 @@ export const AgentNode = memo(({ data }: NodeProps<AgentNodeData>) => {
             )}
           </div>
           <div className="flex items-center gap-1 shrink-0">
-            <Button 
-              size="icon" 
-              variant="ghost" 
+            <Button
+              size="icon"
+              variant="ghost"
               className="h-7 w-7"
               onClick={() => setShowChat(!showChat)}
             >
               <MessageCircle className="w-4 h-4" />
             </Button>
+            {data.onConfigure && (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7"
+                onClick={() => data.onConfigure?.(data.id)}
+                title="Configure agent"
+              >
+                <Settings className="w-4 h-4" />
+              </Button>
+            )}
             <Button size="icon" variant="ghost" className="h-7 w-7">
               <MoreVertical className="w-4 h-4" />
             </Button>
@@ -211,6 +288,14 @@ export const AgentNode = memo(({ data }: NodeProps<AgentNodeData>) => {
                 <div className="text-xs text-muted-foreground">
                   Chat with {data.name} or modify its configuration
                 </div>
+
+                {/* Interim transcript display */}
+                {interimTranscript && (
+                  <div className="p-2 bg-muted/50 rounded text-xs italic text-muted-foreground">
+                    {interimTranscript}
+                  </div>
+                )}
+
                 <div className="flex gap-2">
                   <Input
                     value={chatMessage}
@@ -218,19 +303,26 @@ export const AgentNode = memo(({ data }: NodeProps<AgentNodeData>) => {
                     onKeyPress={handleKeyPress}
                     placeholder="Type your message..."
                     className="flex-1 h-9 text-sm"
+                    disabled={isListening}
                   />
                   <Button
                     size="icon"
-                    variant={isListening ? "default" : "outline"}
+                    variant={isListening ? "destructive" : "outline"}
                     className="h-9 w-9 shrink-0"
                     onClick={handleVoiceInput}
+                    title={isListening ? "Stop listening" : "Start voice input"}
                   >
-                    <Mic className={`w-4 h-4 ${isListening ? 'text-red-500' : ''}`} />
+                    {isListening ? (
+                      <MicOff className="w-4 h-4" />
+                    ) : (
+                      <Mic className="w-4 h-4" />
+                    )}
                   </Button>
                   <Button
                     size="icon"
                     className="h-9 w-9 shrink-0"
                     onClick={handleSendMessage}
+                    disabled={!chatMessage.trim()}
                   >
                     <Send className="w-4 h-4" />
                   </Button>

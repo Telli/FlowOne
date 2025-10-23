@@ -4,6 +4,8 @@ node_modules
 *.md
 !/README.md
 !/GETTING_STARTED.md
+!/copilot-instructions.md
+
 
 # Environment files
 .env
@@ -49,3 +51,9 @@ venv.bak/
 # Test files
 test_*.py
 *_test.py
+
+# Coverage artifacts
+backend/.coverage
+
+# Windows special file accidentally created
+/nul

@@ -1,6 +1,7 @@
 # FlowOne - AI Agent Platform
 
-FlowOne is a comprehensive platform for creating, testing, and deploying AI agents with real-time voice interactions and photorealistic avatars.
+FlowOne is a comprehensive platform for creating, testing, and deploying AI agents with real-time voice interactions and photorealistic avatars.Building and configuring AI agents often involves juggling APIs, prompts, and parameters ,a process that’s powerful but cognitively overwhelming. FlowOne was created to reduce that cognitive load by turning complex agent logic into an intuitive visual and conversational experience.
+Instead of managing code and context manually, users can see, connect, and speak their agents into existence — letting reasoning flow naturally between human intuition and machine intelligence.
 
 ## Quick Start
 

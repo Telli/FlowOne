@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from "react";
-import { Mic, Send, MessageCircle, MicOff, FileText } from "lucide-react";
+import type { KeyboardEvent } from 'react';
+
+import { Mic, Send, MessageCircle, MicOff, FileText, Loader2, Lightbulb } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Card } from "./ui/card";
@@ -8,6 +10,8 @@ import { ScrollArea } from "./ui/scroll-area";
 import { motion, AnimatePresence } from "framer-motion";
 import { AgentConfigForm } from "./AgentConfigForm";
 import { nlpCommands } from "../lib/apiClient";
+import { useToast } from "./ui/use-toast";
+import { generateSuggestions, getSuggestionIcon, type Suggestion } from "../lib/suggestions";
 
 interface Message {
   id: string;
@@ -25,13 +29,21 @@ interface AIAssistantProps {
   messages: Message[];
   sessionEvents?: import("../lib/types").SessionEvent[];
   onTraceId?: (traceId: string) => void;
+  nodes?: any[];
+  edges?: any[];
+  selectedNodeId?: string | null;
 }
 
-export function AIAssistant({ onCommand, messages, sessionEvents = [], onTraceId }: AIAssistantProps) {
+export function AIAssistant({ onCommand, messages, sessionEvents = [], onTraceId, nodes = [], edges = [], selectedNodeId = null }: AIAssistantProps) {
+  const { toast } = useToast();
   const [mode, setMode] = useState<'chat' | 'voice' | 'form'>('chat');
   const [input, setInput] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [interimTranscript, setInterimTranscript] = useState('');
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
 
@@ -41,73 +53,136 @@ export function AIAssistant({ onCommand, messages, sessionEvents = [], onTraceId
     }
   }, [messages]);
 
+  // Generate suggestions based on canvas state
+  useEffect(() => {
+    const localSuggestions = generateSuggestions(nodes, edges, selectedNodeId);
+    setSuggestions(localSuggestions);
+  }, [nodes, edges, selectedNodeId]);
+
   useEffect(() => {
     // Initialize Web Speech API
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = false;
-      recognitionRef.current.interimResults = true;
-
-      recognitionRef.current.onresult = (event: any) => {
-        const transcript = Array.from(event.results)
-          .map((result: any) => result[0])
-          .map((result) => result.transcript)
-          .join('');
-        setTranscript(transcript);
-      };
-
-      recognitionRef.current.onend = () => {
-        setIsListening(false);
-        if (transcript) {
-          onCommand(transcript);
-          setTranscript('');
-        }
-      };
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      setVoiceError('Voice input not supported in this browser. Please use Chrome or Edge.');
+      return;
     }
+
+    const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+    recognitionRef.current = new SpeechRecognition();
+    recognitionRef.current.continuous = false;
+    recognitionRef.current.interimResults = true;
+    recognitionRef.current.lang = 'en-US';
+
+    recognitionRef.current.onstart = () => {
+      console.log('[Voice] Started listening');
+      setIsListening(true);
+      setVoiceError(null);
+    };
+
+    recognitionRef.current.onresult = (event: any) => {
+      let interim = '';
+      let final = '';
+
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcriptText = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          final += transcriptText;
+        } else {
+          interim += transcriptText;
+        }
+      }
+
+      setInterimTranscript(interim);
+      if (final) {
+        setTranscript(final);
+      }
+    };
+
+    recognitionRef.current.onend = () => {
+      console.log('[Voice] Stopped listening');
+      setIsListening(false);
+
+      // Process final transcript
+      if (transcript) {
+        setInput(transcript);
+        setTranscript('');
+        setInterimTranscript('');
+      }
+    };
+
+    recognitionRef.current.onerror = (event: any) => {
+      console.error('[Voice] Error:', event.error);
+      setIsListening(false);
+
+      if (event.error === 'not-allowed') {
+        setVoiceError('Microphone access denied. Please allow microphone access.');
+      } else if (event.error === 'no-speech') {
+        setVoiceError('No speech detected. Please try again.');
+      } else {
+        setVoiceError(`Voice error: ${event.error}`);
+      }
+    };
 
     return () => {
       if (recognitionRef.current) {
         recognitionRef.current.stop();
       }
     };
-  }, [transcript, onCommand]);
+  }, [transcript]);
 
-  const toggleListening = () => {
+  const toggleVoice = () => {
+    if (!recognitionRef.current) {
+      toast({ title: 'Error', description: 'Voice input not available', variant: 'destructive' });
+      return;
+    }
+
     if (isListening) {
-      recognitionRef.current?.stop();
-      setIsListening(false);
+      recognitionRef.current.stop();
     } else {
-      recognitionRef.current?.start();
-      setIsListening(true);
-      setTranscript('');
+      try {
+        recognitionRef.current.start();
+      } catch (error) {
+        console.error('[Voice] Start error:', error);
+        toast({ title: 'Error', description: 'Failed to start voice input', variant: 'destructive' });
+      }
     }
   };
 
   const handleSend = async () => {
-    if (!input.trim()) return;
+    if (!input.trim() || isProcessing) return;
+
     const text = input;
     setInput('');
-    // forward to existing command bus for UI feedback
-    onCommand(text);
-    // also call backend NLP to drive structured actions
+    setIsProcessing(true);
+
     try {
+      // Call backend NLP only
       const cmd = await nlpCommands(text);
-      if (cmd.action === 'create' && cmd.config) {
-        onCommand(`Create ${cmd.config.name || 'agent'}`);
-      } else if (cmd.action === 'modify' && cmd.modification) {
-        onCommand(`Modify agent`);
-      }
+
+      // Track trace ID
       if ((cmd as any).trace_id) {
-        if (onTraceId) onTraceId((cmd as any).trace_id);
-        console.log('trace_id', (cmd as any).trace_id);
+        onTraceId?.((cmd as any).trace_id);
+        console.log('[NLP] trace_id:', (cmd as any).trace_id);
       }
-    } catch (e) {
-      // ignore; UI already handled local path
+
+      // Execute action based on NLP response
+      if (cmd.action === 'create' && cmd.config) {
+        onCommand(`Creating agent: ${cmd.config.name || 'New Agent'}`);
+      } else if (cmd.action === 'modify' && cmd.modification) {
+        onCommand(`Modifying agent`);
+      } else if (cmd.action === 'connect' && (cmd as any).connection) {
+        onCommand(`Connecting agents`);
+      } else {
+        onCommand(text);
+      }
+    } catch (error) {
+      console.error('[AIAssistant] NLP error:', error);
+      toast({ title: 'Error', description: 'Failed to process command', variant: 'destructive' });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyPress = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       handleSend();
     }
@@ -117,12 +192,6 @@ export function AIAssistant({ onCommand, messages, sessionEvents = [], onTraceId
     { label: "Create", command: "Create sales agent" },
     { label: "Modify", command: "Make it more professional" },
     { label: "Connect", command: "Connect agents together" }
-  ];
-
-  const suggestions = [
-    "Create sales agent",
-    "Make it more professional",
-    "Add CRM tools"
   ];
 
   return (
@@ -135,7 +204,7 @@ export function AIAssistant({ onCommand, messages, sessionEvents = [], onTraceId
             AI Configuration Assistant
           </h3>
         </div>
-        
+
         {/* Mode Toggle */}
         <div className="flex gap-2">
           <Button
@@ -200,8 +269,8 @@ export function AIAssistant({ onCommand, messages, sessionEvents = [], onTraceId
                     className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
                   >
                     <Card className={`max-w-[85%] p-3 ${
-                      message.type === 'user' 
-                        ? 'bg-primary text-primary-foreground' 
+                      message.type === 'user'
+                        ? 'bg-primary text-primary-foreground'
                         : 'bg-muted'
                     }`}>
                       <div className="text-sm">{message.content}</div>
@@ -213,8 +282,8 @@ export function AIAssistant({ onCommand, messages, sessionEvents = [], onTraceId
                         </div>
                       )}
                       <div className={`text-xs mt-1 ${
-                        message.type === 'user' 
-                          ? 'text-primary-foreground/70' 
+                        message.type === 'user'
+                          ? 'text-primary-foreground/70'
                           : 'text-muted-foreground'
                       }`}>
                         {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -311,23 +380,34 @@ export function AIAssistant({ onCommand, messages, sessionEvents = [], onTraceId
               onKeyPress={handleKeyPress}
               placeholder="Type or speak..."
               className="flex-1"
+              disabled={isProcessing}
             />
-            <Button 
-              onClick={toggleListening} 
+            <Button
+              onClick={toggleVoice}
               size="icon"
               variant={isListening ? "default" : "outline"}
+              disabled={isProcessing}
             >
               <Mic className={`w-4 h-4 ${isListening ? 'text-red-500' : ''}`} />
             </Button>
-            <Button onClick={handleSend} size="icon">
-              <Send className="w-4 h-4" />
+            <Button
+              onClick={handleSend}
+              size="icon"
+              disabled={!input.trim() || isProcessing}
+            >
+              {isProcessing ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Send className="w-4 h-4" />
+              )}
             </Button>
           </div>
         ) : (
           <Button
-            onClick={toggleListening}
+            onClick={toggleVoice}
             className={`w-full gap-2 ${isListening ? 'bg-red-500 hover:bg-red-600' : ''}`}
             size="lg"
+            disabled={isProcessing}
           >
             {isListening ? (
               <>
@@ -361,20 +441,27 @@ export function AIAssistant({ onCommand, messages, sessionEvents = [], onTraceId
         </div>
 
         {/* Suggestions */}
-        <div>
-          <div className="text-xs text-muted-foreground mb-2">💡 Try saying:</div>
-          <div className="space-y-1">
-            {suggestions.map((suggestion, idx) => (
-              <div
-                key={idx}
-                className="text-xs text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
-                onClick={() => mode === 'chat' ? setInput(suggestion) : onCommand(suggestion)}
-              >
-                "{suggestion}"
-              </div>
-            ))}
+        {suggestions.length > 0 && (
+          <div>
+            <div className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+              <Lightbulb className="w-3 h-3" />
+              Suggestions:
+            </div>
+            <div className="space-y-1">
+              {suggestions.map((suggestion) => (
+                <div
+                  key={suggestion.id}
+                  className="text-xs text-muted-foreground hover:text-foreground cursor-pointer transition-colors flex items-center gap-2 p-1 rounded hover:bg-muted/50"
+                  onClick={() => setInput(suggestion.text)}
+                  title={`${suggestion.category} (priority: ${suggestion.priority})`}
+                >
+                  <span>{getSuggestionIcon(suggestion.category)}</span>
+                  <span>{suggestion.text}</span>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
         </div>
       )}
     </div>

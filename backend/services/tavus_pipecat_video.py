@@ -11,14 +11,14 @@ room URL to clients if they need to render it on the frontend.
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Dict, Optional, Tuple, Callable
+from typing import Any, Dict, Optional, Tuple, Callable, Union
 from datetime import datetime
 
 from settings import get_settings
 
 
 # Types
-EventEmitter = Callable[[Dict[str, Any]], "asyncio.Future[Any]" | Any]
+EventEmitter = Callable[[Dict[str, Any]], Union["asyncio.Future[Any]", Any]]
 
 
 async def start_tavus_video_pipeline(

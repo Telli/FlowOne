@@ -4,6 +4,8 @@ node_modules
 *.md
 !/README.md
 !/GETTING_STARTED.md
+!/copilot-instructions.md
+
 
 # Environment files
 .env

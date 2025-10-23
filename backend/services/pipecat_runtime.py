@@ -106,6 +106,17 @@ class Session:
             })
             trace_event("agent.error", sessionId=self.id, error=str(e))
 
+    def _resolve_avatar_mode(self) -> str:
+        """Resolve avatar mode with clear precedence rules."""
+        try:
+            mode = getattr(self.settings, 'TAVUS_AVATAR_MODE', None)
+            if mode:
+                return str(mode).lower()
+        except Exception:
+            pass
+        # Legacy fallback flag
+        return "pipecat_daily" if getattr(self.settings, 'USE_TAVUS_PIPECAT_VIDEO', False) else "phoenix_rest"
+
     async def _start_avatar_stream(self, room: Optional[str] = None):
         """Start Tavus Phoenix session for avatar streaming."""
         try:
@@ -130,7 +141,7 @@ class Session:
                 return
 
             # Branch: Pipecat TavusVideoService vs Phoenix REST
-            mode = (getattr(self.settings, 'TAVUS_AVATAR_MODE', None) or ("pipecat_daily" if self.settings.USE_TAVUS_PIPECAT_VIDEO else "phoenix_rest")).lower()
+            mode = self._resolve_avatar_mode()
             if mode == "pipecat_daily":
                 # Pipecat path requires a Daily room to render avatar into
                 if not room:
@@ -289,7 +300,7 @@ class SessionManager:
     def __init__(self):
         self.sessions: Dict[str, Session] = {}
 
-    def spawn(self, session_id: str, agent_card: Dict[str, Any], enable_avatar: bool = False, room: Optional[str] = None):
+    async def spawn_async(self, session_id: str, agent_card: Dict[str, Any], enable_avatar: bool = False, room: Optional[str] = None):
         logger.info(f"[SessionManager] Spawning session {session_id} with enable_avatar={enable_avatar}, room={room}")
         logger.debug(f"[SessionManager] Agent card avatar config: {agent_card.get('avatar', {})}")
 
@@ -302,13 +313,31 @@ class SessionManager:
             "persona": agent_card.get("persona", {}),
         })
         trace_event("session.started", sessionId=session_id, room=room)
-        # Kick off runtime with room parameter
+        # Start and await initialization for deterministic readiness
+        await s.start(room=room)
+
+    def spawn(self, session_id: str, agent_card: Dict[str, Any], enable_avatar: bool = False, room: Optional[str] = None):
+        """Backward-compatible spawn: registers session immediately and schedules async start."""
+        logger.info(f"[SessionManager] Spawning session {session_id} (sync wrapper) with enable_avatar={enable_avatar}, room={room}")
+        s = Session(session_id, agent_card, enable_avatar=enable_avatar)
+        self.sessions[session_id] = s
+        # Emit session.started immediately
         try:
-            asyncio.get_running_loop().create_task(s.start(room=room))
-        except RuntimeError:
-            # No running loop; fallback to default loop
-            loop = asyncio.get_event_loop()
+            s.queue.put_nowait({
+                "type": "session.started",
+                "sessionId": session_id,
+                "persona": agent_card.get("persona", {}),
+            })
+            trace_event("session.started", sessionId=session_id, room=room)
+        except Exception:
+            pass
+        # Schedule start without awaiting
+        try:
+            loop = asyncio.get_running_loop()
             loop.create_task(s.start(room=room))
+        except RuntimeError:
+            asyncio.ensure_future(s.start(room=room))
+        return s
 
     async def events(self, session_id: str):
         session = self.sessions.get(session_id)
@@ -318,13 +347,24 @@ class SessionManager:
         async for ev in session.stream_events():
             yield ev
 
-    def close(self, session_id: str):
+    async def close_async(self, session_id: str):
         if s := self.sessions.pop(session_id, None):
             try:
-                asyncio.get_running_loop().create_task(s.close())
-            except RuntimeError:
-                loop = asyncio.get_event_loop()
-                loop.create_task(s.close())
+                await s.close()
+            except Exception:
+                # Ensure best-effort cleanup
+                pass
+
+    def close(self, session_id: str):
+        """Backward-compatible close: pops immediately and schedules async cleanup."""
+        s = self.sessions.pop(session_id, None)
+        if not s:
+            return
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(s.close())
+        except RuntimeError:
+            asyncio.ensure_future(s.close())
 
     async def emit(self, session_id: str, event: Dict[str, Any]):
         # Allow APIs to push events into a live session queue
@@ -341,8 +381,15 @@ class SessionManager:
             logger.warning(f"[SessionManager] Session {session_id} not found")
             return False
 
-        # Process message asynchronously
-        asyncio.create_task(s.process_user_message(user_text))
+        # Process message asynchronously with error handling; store ref for cleanup
+        task = asyncio.create_task(s.process_user_message(user_text))
+        s._task = task
+        def _log_task_result(t: asyncio.Task):
+            try:
+                t.result()
+            except Exception as e:
+                logger.error(f"[SessionManager] Message task error for {session_id}: {e}")
+        task.add_done_callback(_log_task_result)
         return True
 
 

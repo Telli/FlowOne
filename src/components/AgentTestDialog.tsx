@@ -16,7 +16,7 @@ import { Badge } from "./ui/badge";
 import { useToast } from "./ui/use-toast";
 import { useSessionStore } from "../store/sessionStore";
 
-import DailyIframe from "@daily-co/daily-js";
+import DailyIframe, { DailyCall } from "@daily-co/daily-js";
 
 
 interface Message {
@@ -50,10 +50,10 @@ export function AgentTestDialog({ open, onOpenChange, agent }: AgentTestDialogPr
   const [sessionStarted, setSessionStarted] = useState(false);
   const avatarVideoRef = useRef<HTMLVideoElement | null>(null);
   const [avatarMediaStream, setAvatarMediaStream] = useState<MediaStream | null>(null);
-  const dailyCallRef = useRef<any>(null);
+  const dailyCallRef = useRef<DailyCall | null>(null);
 
   useEffect(() => {
-    const el = avatarVideoRef.current as any;
+    const el = avatarVideoRef.current;
     if (!el) return;
     try {
       if (avatarMediaStream) {
@@ -297,7 +297,7 @@ export function AgentTestDialog({ open, onOpenChange, agent }: AgentTestDialogPr
         try { await dailyCallRef.current.destroy(); } catch {}
         dailyCallRef.current = null;
       }
-      const call = (DailyIframe as any).createCallObject({ subscribeToTracksAutomatically: true });
+      const call = DailyIframe.createCallObject({ subscribeToTracksAutomatically: true });
       dailyCallRef.current = call;
 
       call.on('track-started', (ev: any) => {

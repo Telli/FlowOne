@@ -9,7 +9,10 @@ class TavusClient:
     
     def __init__(self):
         self.settings = get_settings()
-        self.base_url = (getattr(self.settings, "TAVUS_BASE_URL", "https://tavusapi.com/v2") or "https://tavusapi.com/v2").rstrip("/")
+        # Derive and normalize base URL with readable steps
+        base_url_setting = getattr(self.settings, "TAVUS_BASE_URL", "https://tavusapi.com/v2")
+        base_url_value = base_url_setting or "https://tavusapi.com/v2"
+        self.base_url = base_url_value.rstrip("/")
         self.api_key = self.settings.TAVUS_API_KEY
 
     async def start_phoenix_session(

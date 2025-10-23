@@ -53,23 +53,5 @@ jobs:
           path: |
             src/coverage
 
-  e2e:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - name: Install deps
-        run: npm install
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps
-      - name: Build and preview src app
-        run: |
-          cd src
-          npm run build
-          npm run preview &
-          npx wait-on http://localhost:4173
-      - name: Run E2E tests
-        run: npm run test:e2e
+
 

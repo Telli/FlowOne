@@ -10,6 +10,20 @@ from services.gemini_flash import generate_agent_reply
 from observability.langfuse import trace_event
 from settings import get_settings
 
+# Shared utilities (tolerant import for different run contexts)
+try:
+    from backend.api.utils import is_duplicate_room_error
+except Exception:  # pragma: no cover - fallback for alternate import paths
+    try:
+        from api.utils import is_duplicate_room_error  # type: ignore
+    except Exception:
+        def is_duplicate_room_error(status_code: int, data):
+            return (
+                status_code == 400 and isinstance(data, dict)
+                and data.get("error") == "invalid-request-error"
+                and "already exists" in (data.get("info") or "")
+            )
+
 
 router = APIRouter()
 session_manager = SessionManager()
@@ -79,7 +93,7 @@ async def create_daily_room_for_avatar(session_id: str) -> str:
                     data = resp.json()
                 except Exception:
                     data = {}
-                if isinstance(data, dict) and data.get("error") == "invalid-request-error" and "already exists" in (data.get("info") or ""):
+                if is_duplicate_room_error(resp.status_code, data):
                     print(f"[Sessions] Daily.co room already exists (400): {room_name}")
                     return room_name
 
@@ -104,7 +118,7 @@ async def create_session_ep(body: CreateSessionRequest):
         room = await create_daily_room_for_avatar(session_id)
         print(f"[Sessions] Session {session_id} created with avatar enabled, room: {room}")
 
-    session_manager.spawn(session_id, agent.to_card(), enable_avatar=body.enableAvatar, room=room)
+    await session_manager.spawn_async(session_id, agent.to_card(), enable_avatar=body.enableAvatar, room=room)
     trace_id = trace_event("session.create", sessionId=session_id, agentId=body.agentId, enableAvatar=body.enableAvatar, room=room)
     return {"sessionId": session_id, "trace_id": trace_id, "room": room}
 
@@ -116,7 +130,7 @@ async def ws_events(ws: WebSocket, session_id: str):
         async for event in session_manager.events(session_id):
             await ws.send_json(event)
     except WebSocketDisconnect:
-        session_manager.close(session_id)
+        await session_manager.close_async(session_id)
 
 
 @router.post("/{session_id}/messages")

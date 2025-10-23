@@ -8,6 +8,20 @@ try:
 except Exception:
     from settings import get_settings as _get_settings, Settings as _Settings
 
+# Shared utilities (tolerant import for different run contexts)
+try:
+    from backend.api.utils import is_duplicate_room_error
+except Exception:  # pragma: no cover - fallback for alternate import paths
+    try:
+        from api.utils import is_duplicate_room_error  # type: ignore
+    except Exception:
+        def is_duplicate_room_error(status_code: int, data):
+            return (
+                status_code == 400 and isinstance(data, dict)
+                and data.get("error") == "invalid-request-error"
+                and "already exists" in (data.get("info") or "")
+            )
+
 router = APIRouter()
 
 
@@ -46,12 +60,11 @@ async def create_daily_token(sessionId: str = Query(...), settings: _Settings = 
             if r_check.status_code != 200:
                 r_create = await client.post("https://api.daily.co/v1/rooms", headers=headers, json=room_payload)
                 if r_create.status_code not in (200, 201):
-                    # If it's a 400 because the room already exists, proceed
                     try:
                         data = r_create.json()
                     except Exception:
                         data = {}
-                    if not (r_create.status_code == 400 and isinstance(data, dict) and data.get("error") == "invalid-request-error" and "already exists" in (data.get("info") or "")):
+                    if not is_duplicate_room_error(r_create.status_code, data):
                         raise HTTPException(status_code=500, detail=f"Daily room error: {r_create.text}")
         except Exception:
             # Non-fatal; token creation below will still fail if room truly doesn't exist

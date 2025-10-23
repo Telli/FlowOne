@@ -2,7 +2,9 @@
 
 ## Summary
 
-**Tavus avatar streaming is currently NOT WORKING on Windows** due to platform limitations with the required dependencies.
+**UPDATE (2025-10-23)**: ✅ **Persona Management has been implemented!** Avatar streaming now works on Windows via Phoenix REST mode.
+
+**Original Issue**: Tavus avatar streaming was not working on Windows due to platform limitations with the `daily-python` package.
 
 ## The Problem
 
@@ -13,14 +15,64 @@
 - **Reference**: [pipecat-ai/pipecat#759](https://github.com/pipecat-ai/pipecat/issues/759) - "Hopefully, daily-python will have support for Windows early 2025"
 
 ### Phoenix REST Mode (Fallback)
-- **Status**: ❌ **NOT WORKING** (API endpoint deprecated)
-- **Reason**: Tavus API v2 no longer has `/phoenix` endpoint
-- **Current Endpoint**: `/v2/conversations` (requires `persona_id` which we don't manage yet)
-- **Error**: `404 Not Found` when trying to use `/phoenix`
+- **Status**: ✅ **NOW WORKING** (Persona Management Implemented)
+- **Previous Issue**: Tavus API v2 no longer has `/phoenix` endpoint
+- **Solution**: Implemented persona management to use `/v2/conversations` endpoint
+- **Current Endpoint**: `/v2/conversations` (requires `persona_id` - now supported!)
 
 ## Solutions
 
-### Option 1: Use WSL (Windows Subsystem for Linux) ✅ RECOMMENDED
+### Option 1: Use Persona Management ✅ **IMPLEMENTED** (Recommended for Windows)
+**Status**: ✅ **COMPLETE** - See [PERSONA_MANAGEMENT_GUIDE.md](PERSONA_MANAGEMENT_GUIDE.md)
+
+1. Create a Tavus persona via `/personas` API endpoint
+2. Update agent with `tavusPersonaId` in avatar configuration
+3. Start session with `enableAvatar: true`
+4. Phoenix REST mode automatically uses the persona_id
+
+**Pros**:
+- ✅ Works natively on Windows
+- ✅ Uses official Tavus API v2
+- ✅ Full persona customization (system prompt, context, layers)
+- ✅ No WSL required
+
+**Cons**:
+- Requires Tavus API key
+- Requires persona creation step
+
+**Quick Start**:
+```bash
+# 1. Set TAVUS_API_KEY in .env
+TAVUS_API_KEY=your_key_here
+TAVUS_AVATAR_MODE=phoenix_rest
+
+# 2. Create a persona
+POST /personas
+{
+  "persona_name": "My Coach",
+  "system_prompt": "You are a helpful coach..."
+}
+
+# 3. Update agent with persona_id
+PATCH /agents/{agent_id}
+{
+  "avatar": {
+    "replicaId": "r123...",
+    "tavusPersonaId": "pe_abc..."
+  }
+}
+
+# 4. Start session
+POST /sessions
+{
+  "agentId": "agent_id",
+  "enableAvatar": true
+}
+```
+
+### Option 2: Use WSL (Windows Subsystem for Linux)
+**Status**: Alternative option for Pipecat Daily mode
+
 1. Install WSL2 on Windows
 2. Install Python 3.10+ in WSL
 3. Install `daily-python` in WSL environment
@@ -36,21 +88,6 @@
 - Requires WSL setup
 - More complex development environment
 
-### Option 2: Implement Persona Management ⚠️ REQUIRES WORK
-1. Create a persona management system
-2. Store persona IDs in agent cards
-3. Update Phoenix REST mode to use `/v2/conversations` endpoint
-4. Handle `conversation_url` instead of `video_stream_url`
-
-**Pros**:
-- Works natively on Windows
-- Uses official Tavus API v2
-
-**Cons**:
-- Requires significant development work
-- Need to manage personas lifecycle
-- Different response format than Pipecat mode
-
 ### Option 3: Wait for Windows Support ⏳ NOT RECOMMENDED
 Wait for `daily-python` to add Windows support (mentioned as "early 2025" in GitHub issues).
 
@@ -60,6 +97,8 @@ Wait for `daily-python` to add Windows support (mentioned as "early 2025" in Git
 **Cons**:
 - Timeline uncertain
 - No guarantee of Windows support
+
+**Note**: With Persona Management now implemented (Option 1), this option is no longer necessary for Windows users.
 
 ## Current Configuration
 

@@ -6,6 +6,7 @@ node_modules
 !/GETTING_STARTED.md
 !/copilot-instructions.md
 !/TAVUS_AVATAR_WINDOWS_LIMITATION.md
+!/PERSONA_MANAGEMENT_GUIDE.md
 
 
 # Environment files
@@ -54,6 +55,7 @@ backend/.coverage
 
 # Temporary test scripts in root (not part of test suite)
 /test_*.py
+!/test_persona_workflow.py
 
 # Windows special file accidentally created
 /nul

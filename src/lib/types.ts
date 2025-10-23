@@ -15,6 +15,12 @@ export interface AgentRoutingPolicy {
   adapt: string[]; // e.g. ["concise", "encourage"]
 }
 
+export interface AvatarConfig {
+  replicaId: string;
+  thumbnailUrl?: string;
+  tavusPersonaId?: string;
+}
+
 export interface AgentCard {
   id: string;
   name: string;
@@ -22,6 +28,7 @@ export interface AgentCard {
   tools: any[];
   memory: { summaries: string[]; vectors: any[] };
   routing?: { policies: AgentRoutingPolicy[] };
+  avatar?: AvatarConfig;
 }
 
 export interface SessionEvent {
@@ -34,5 +41,31 @@ export interface SessionEvent {
   doc_id?: string;
   score?: number;
   value_ms?: number;
+}
+
+// Tavus Persona Management Types
+export interface TavusPersonaLayer {
+  perception?: Record<string, any>;
+  stt?: Record<string, any>;
+  llm?: Record<string, any>;
+  tts?: Record<string, any>;
+}
+
+export interface TavusPersona {
+  persona_id: string;
+  persona_name: string;
+  system_prompt: string;
+  context?: string;
+  default_replica_id?: string;
+  layers?: TavusPersonaLayer;
+  created_at?: string;
+}
+
+export interface CreatePersonaRequest {
+  persona_name: string;
+  system_prompt: string;
+  context?: string;
+  default_replica_id?: string;
+  layers?: TavusPersonaLayer;
 }
 

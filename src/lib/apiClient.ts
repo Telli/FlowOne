@@ -1,12 +1,8 @@
 import { cache, clearCachePattern } from './cache';
+import type { AgentCard, TavusPersona, CreatePersonaRequest } from './types';
 
-export interface AgentCard {
-  id: string;
-  name: string;
-  persona: { role: string; goals: string[]; tone: string; style?: any };
-  tools: any[];
-  memory: { summaries: string[]; vectors: any[] };
-}
+// Re-export AgentCard for backward compatibility
+export type { AgentCard };
 
 const API_URL = (import.meta as any).env?.VITE_API_URL || "http://localhost:8000";
 const API_WS = (import.meta as any).env?.VITE_API_WS || "ws://localhost:8000";
@@ -176,7 +172,20 @@ export async function getTemplates(): Promise<TemplateItem[]>{
 }
 
 // Agents
-export async function patchAgent(agentId: string, patch: { role?: string; goals?: string[]; tone?: string; style?: any }): Promise<string | undefined> {
+export async function patchAgent(
+  agentId: string,
+  patch: {
+    role?: string;
+    goals?: string[];
+    tone?: string;
+    style?: any;
+    avatar?: {
+      replicaId?: string;
+      thumbnailUrl?: string;
+      tavusPersonaId?: string;
+    };
+  }
+): Promise<string | undefined> {
   const json = await fetchJson(`${API_URL}/agents/${agentId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
@@ -195,6 +204,68 @@ export async function patchAgent(agentId: string, patch: { role?: string; goals?
  */
 export function clearAllCaches(): void {
   cache.clear();
+}
+
+// ============================================================================
+// Tavus Persona Management
+// ============================================================================
+
+/**
+ * Create a new Tavus persona
+ */
+export async function createPersona(request: CreatePersonaRequest): Promise<TavusPersona> {
+  const data = await fetchJson(`${API_URL}/personas`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  });
+
+  // Invalidate persona cache
+  cache.delete('personas:list');
+
+  return data as TavusPersona;
+}
+
+/**
+ * Get a specific persona by ID
+ */
+export async function getPersona(personaId: string): Promise<TavusPersona> {
+  const cacheKey = `persona:${personaId}`;
+  const cached = cache.get(cacheKey);
+  if (cached) return cached;
+
+  const data = await fetchJson(`${API_URL}/personas/${personaId}`);
+  cache.set(cacheKey, data, CACHE_TTL.AGENTS);
+
+  return data as TavusPersona;
+}
+
+/**
+ * List all personas
+ */
+export async function listPersonas(): Promise<TavusPersona[]> {
+  const cacheKey = 'personas:list';
+  const cached = cache.get(cacheKey);
+  if (cached) return cached;
+
+  const data = await fetchJson(`${API_URL}/personas`);
+  const personas = data.personas || [];
+  cache.set(cacheKey, personas, CACHE_TTL.AGENTS);
+
+  return personas as TavusPersona[];
+}
+
+/**
+ * Delete a persona
+ */
+export async function deletePersona(personaId: string): Promise<void> {
+  await fetchJson(`${API_URL}/personas/${personaId}`, {
+    method: "DELETE",
+  });
+
+  // Invalidate caches
+  cache.delete(`persona:${personaId}`);
+  cache.delete('personas:list');
 }
 
 

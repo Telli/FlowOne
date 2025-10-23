@@ -7,10 +7,12 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { X, Loader2 } from 'lucide-react';
+import { X, Loader2, User } from 'lucide-react';
 import { toast } from 'sonner';
 import { AgentNodeData } from './AgentNode';
 import { AvatarSelector } from './AvatarSelector';
+import { PersonaManager } from './PersonaManager';
+import type { TavusPersona } from '../lib/types';
 
 interface NodeConfigDialogProps {
   open: boolean;
@@ -34,7 +36,8 @@ const agentTypes = [
 export function NodeConfigDialog({ open, onOpenChange, nodeData, onUpdate }: NodeConfigDialogProps) {
   const [activeTab, setActiveTab] = useState('form');
   const [loading, setLoading] = useState(false);
-  
+  const [showPersonaManager, setShowPersonaManager] = useState(false);
+
   // Form state
   const [name, setName] = useState(nodeData.name);
   const [type, setType] = useState(nodeData.type || 'custom');
@@ -43,6 +46,8 @@ export function NodeConfigDialog({ open, onOpenChange, nodeData, onUpdate }: Nod
   const [tools, setTools] = useState<string[]>(nodeData.tools || []);
   const [newTool, setNewTool] = useState('');
   const [avatarReplicaId, setAvatarReplicaId] = useState<string | undefined>();
+  const [tavusPersonaId, setTavusPersonaId] = useState<string | undefined>();
+  const [selectedPersonaName, setSelectedPersonaName] = useState<string | undefined>();
 
   const handleAddTool = () => {
     if (newTool.trim() && !tools.includes(newTool)) {
@@ -55,6 +60,12 @@ export function NodeConfigDialog({ open, onOpenChange, nodeData, onUpdate }: Nod
     setTools(tools.filter(t => t !== tool));
   };
 
+  const handlePersonaSelect = (persona: TavusPersona) => {
+    setTavusPersonaId(persona.persona_id);
+    setSelectedPersonaName(persona.persona_name);
+    toast.success(`Selected persona: ${persona.persona_name}`);
+  };
+
   const handleSave = async () => {
     if (!name.trim() || !persona.trim()) {
       toast.error('Name and persona are required');
@@ -64,6 +75,13 @@ export function NodeConfigDialog({ open, onOpenChange, nodeData, onUpdate }: Nod
     setLoading(true);
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
+      // Build avatar config if either replica or persona is set
+      const avatarConfig = (avatarReplicaId || tavusPersonaId) ? {
+        replicaId: avatarReplicaId,
+        tavusPersonaId: tavusPersonaId
+      } : undefined;
+
       const response = await fetch(`${API_URL}/agents/${nodeData.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -71,7 +89,7 @@ export function NodeConfigDialog({ open, onOpenChange, nodeData, onUpdate }: Nod
           role: persona,
           goals: tools,
           tone: voice.includes('friendly') ? 'friendly' : voice.includes('warm') ? 'warm' : 'neutral',
-          avatarReplicaId: avatarReplicaId
+          avatar: avatarConfig
         })
       });
 
@@ -177,6 +195,38 @@ export function NodeConfigDialog({ open, onOpenChange, nodeData, onUpdate }: Nod
             </div>
 
             <div className="space-y-2">
+              <Label htmlFor="persona-select">Tavus Persona (Optional)</Label>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  {selectedPersonaName ? (
+                    <div className="flex items-center gap-2 px-3 py-2 border rounded-md bg-muted">
+                      <User className="w-4 h-4" />
+                      <span className="text-sm">{selectedPersonaName}</span>
+                      <Badge variant="secondary" className="ml-auto text-xs">
+                        {tavusPersonaId?.slice(0, 8)}...
+                      </Badge>
+                    </div>
+                  ) : (
+                    <div className="px-3 py-2 border rounded-md text-sm text-muted-foreground">
+                      No persona selected
+                    </div>
+                  )}
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowPersonaManager(true)}
+                >
+                  <User className="w-4 h-4 mr-2" />
+                  {selectedPersonaName ? 'Change' : 'Select'}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Personas define the AI behavior for avatar conversations (Windows compatible)
+              </p>
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="tools">Tools</Label>
               <div className="flex gap-2">
                 <Input
@@ -229,6 +279,13 @@ export function NodeConfigDialog({ open, onOpenChange, nodeData, onUpdate }: Nod
           </TabsContent>
         </Tabs>
       </DialogContent>
+
+      {/* Persona Manager Dialog */}
+      <PersonaManager
+        open={showPersonaManager}
+        onOpenChange={setShowPersonaManager}
+        onPersonaSelect={handlePersonaSelect}
+      />
     </Dialog>
   );
 }

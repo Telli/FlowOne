@@ -19,10 +19,12 @@ class Settings(BaseSettings):
     # Tavus configuration
     TAVUS_BASE_URL: str = "https://tavusapi.com/v2"
     # Avatar mode: 'pipecat_daily' (render in Daily room) or 'phoenix_rest' (direct video URL)
+    # NOTE: pipecat_daily requires daily-python which is NOT available on Windows
+    # Use phoenix_rest on Windows or WSL for pipecat_daily
     # If not set, falls back to USE_TAVUS_PIPECAT_VIDEO (legacy boolean).
-    TAVUS_AVATAR_MODE: str = "pipecat_daily"
+    TAVUS_AVATAR_MODE: str = "phoenix_rest"  # Default to phoenix_rest for Windows compatibility
     # Legacy flag retained for backward compatibility
-    USE_TAVUS_PIPECAT_VIDEO: bool = True
+    USE_TAVUS_PIPECAT_VIDEO: bool = False
     # Optional explicit replica id override (falls back to TAVUS_DEFAULT_REPLICA_ID)
     TAVUS_REPLICA_ID: str = ""
 

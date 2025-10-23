@@ -169,12 +169,20 @@ class Session:
                     self._tavus_pipeline = pipeline
                     self._tavus_transport = transport
                     self._tavus_task = task
+                    logger.info(f"[Session {self.id}] Pipecat Tavus pipeline started successfully")
                     return
                 except ImportError as e:
-                    # Fallback to Phoenix if dependency missing
-                    trace_event("avatar.warn", sessionId=self.id, warning=f"Pipecat not available: {e}")
-                    # continue to Phoenix branch below
+                    # Pipecat dependencies not installed - this is a fatal error for pipecat_daily mode
+                    logger.error(f"[Session {self.id}] Pipecat import failed: {e}")
+                    trace_event("avatar.error", sessionId=self.id, error=f"Pipecat not available: {e}")
+                    await self.queue.put({
+                        "type": "avatar.error",
+                        "error": f"Pipecat dependencies not installed: {e}",
+                        "sessionId": self.id
+                    })
+                    return
                 except Exception as e:
+                    logger.error(f"[Session {self.id}] Pipecat init failed: {e}")
                     trace_event("avatar.error", sessionId=self.id, error=f"Pipecat init failed: {e}")
                     await self.queue.put({
                         "type": "avatar.error",

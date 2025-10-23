@@ -14,9 +14,10 @@ pytest-cov
 respx
 
 # Production Pipeline Components
+pipecat-ai[daily]     # Daily.co WebRTC transport
 pipecat-ai[deepgram]  # Deepgram STT
 pipecat-ai[cartesia]  # Cartesia TTS
-pipecat-ai[tavus]  # Tavus VideoService
+pipecat-ai[tavus]     # Tavus VideoService
 
 google-generativeai  # Gemini Flash direct API
 

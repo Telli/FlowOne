@@ -5,6 +5,7 @@ node_modules
 !/README.md
 !/GETTING_STARTED.md
 !/copilot-instructions.md
+!/TAVUS_AVATAR_WINDOWS_LIMITATION.md
 
 
 # Environment files
@@ -48,12 +49,11 @@ ENV/
 env.bak/
 venv.bak/
 
-# Test files
-test_*.py
-*_test.py
-
 # Coverage artifacts
 backend/.coverage
+
+# Temporary test scripts in root (not part of test suite)
+/test_*.py
 
 # Windows special file accidentally created
 /nul

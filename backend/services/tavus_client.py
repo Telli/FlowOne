@@ -22,38 +22,49 @@ class TavusClient:
         enable_vision: bool = False
     ) -> Dict[str, Any]:
         """
-        Start a Tavus Phoenix session for real-time avatar generation.
+        Start a Tavus conversation session for real-time avatar streaming.
+
+        NOTE: This uses the Tavus API v2 /conversations endpoint.
+        The old /phoenix endpoint no longer exists in Tavus API v2.
+
+        WARNING: This method is currently NOT WORKING because:
+        1. Tavus /conversations endpoint requires a persona_id
+        2. We don't have a way to create/manage personas yet
+        3. The response format is different (conversation_url instead of video_stream_url)
+
+        For now, use pipecat_daily mode on Linux/macOS or implement persona management.
 
         Args:
             replica_id: Tavus replica ID
-            audio_stream_url: URL or stream endpoint for audio input
+            audio_stream_url: URL or stream endpoint for audio input (currently unused)
             enable_vision: Whether to enable vision input (default: False for audio-only)
 
         Returns:
-            Dict with session_id, video_stream_url, and status
+            Dict with conversation_id, conversation_url, and status
         """
         if not self.api_key or self.api_key == "your_tavus_api_key_here":
             print("WARNING: TAVUS_API_KEY not configured")
             return {
                 "error": "TAVUS_API_KEY not configured",
-                "session_id": None,
-                "video_stream_url": None
+                "conversation_id": None,
+                "conversation_url": None
             }
 
         try:
+            # Tavus API v2 /conversations endpoint requires replica_id
+            # persona_id is REQUIRED - we need to implement persona management
             payload = {
                 "replica_id": replica_id,
-                "stream_input": {
-                    "audio_url": audio_stream_url
-                },
-                "enable_vision": enable_vision
+                "conversation_name": f"FlowOne Session"
+                # TODO: Add persona_id when persona management is implemented
             }
 
-            print(f"[Tavus] Starting Phoenix session with replica_id={replica_id}, audio_url={audio_stream_url}")
+            print(f"[Tavus] Starting conversation with replica_id={replica_id}")
+            print(f"[Tavus] WARNING: This endpoint requires persona_id which is not yet implemented")
 
             async with httpx.AsyncClient() as client:
                 response = await client.post(
-                    f"{self.base_url}/phoenix",
+                    f"{self.base_url}/conversations",
                     headers={
                         "x-api-key": self.api_key,
                         "Content-Type": "application/json"
@@ -67,36 +78,36 @@ class TavusClient:
                     print(f"[Tavus] API error {response.status_code}: {error_detail}")
                     return {
                         "error": f"Tavus API error: {response.status_code}",
-                        "session_id": None,
-                        "video_stream_url": None,
+                        "conversation_id": None,
+                        "conversation_url": None,
                         "details": error_detail
                     }
 
                 data = response.json()
-                video_url = data.get("video_stream_url")
-                session_id = data.get("session_id")
+                conversation_id = data.get("conversation_id")
+                conversation_url = data.get("conversation_url")
 
-                print(f"[Tavus] Phoenix session started: session_id={session_id}, video_url={video_url}")
+                print(f"[Tavus] Conversation started: conversation_id={conversation_id}, url={conversation_url}")
 
                 return {
                     "error": None,
-                    "session_id": session_id,
-                    "video_stream_url": video_url,
+                    "conversation_id": conversation_id,
+                    "conversation_url": conversation_url,
                     "status": data.get("status", "started")
                 }
         except httpx.TimeoutException as e:
             print(f"[Tavus] Timeout error: {str(e)}")
             return {
                 "error": f"Tavus API timeout: {str(e)}",
-                "session_id": None,
-                "video_stream_url": None
+                "conversation_id": None,
+                "conversation_url": None
             }
         except Exception as e:
             print(f"[Tavus] Unexpected error: {str(e)}")
             return {
                 "error": f"Failed to start Tavus session: {str(e)}",
-                "session_id": None,
-                "video_stream_url": None
+                "conversation_id": None,
+                "conversation_url": None
             }
     
     async def stop_phoenix_session(self, session_id: str) -> Dict[str, Any]:

@@ -297,10 +297,22 @@ function FlowOneApp() {
         }
       };
 
-      const config = configMap[template.id];
+      // Use template.key (for API templates) or template.id (for local templates)
+      const lookupKey = template.key || template.id;
+      const config = configMap[lookupKey];
       if (config) {
         createAgent(config, position);
         toast.success(`${config.name} added! ✓`);
+      } else {
+        // For custom templates without a matching config, create a generic agent
+        createAgent({
+          name: template.name || 'Custom Agent',
+          persona: template.description || 'Custom agent',
+          voice: 'Clear voice (1.0x)',
+          tools: [],
+          type: 'custom'
+        }, position);
+        toast.success(`${template.name || 'Custom Agent'} added! ✓`);
       }
     },
     [createAgent]

@@ -11,6 +11,7 @@ interface AgentTemplate {
   icon: React.ReactNode;
   description: string;
   color: string;
+  key?: string; // Optional key for API templates (e.g., "sales", "tutor")
 }
 
 const localTemplates: AgentTemplate[] = [
@@ -40,7 +41,8 @@ export function AgentPalette({ onTalkToAI }: AgentPaletteProps) {
 
         // Map API templates to AgentTemplate format using UUID as id
         const customTemplates: AgentTemplate[] = list.map((t) => ({
-          id: t.id, // Use UUID from API, not key
+          id: t.id, // Use UUID from API for React keys
+          key: t.key, // Preserve key for drag-and-drop lookup
           name: t.name || t.key,
           icon: <Lightbulb className="w-5 h-5" />,
           description: t.description || "",

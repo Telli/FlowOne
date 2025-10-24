@@ -145,6 +145,12 @@ def get_agent(agent_id: str) -> Optional[Agent]:
         return s.get(Agent, agent_id)
 
 
+def list_agents() -> List[Agent]:
+    """List all agents from the database."""
+    with Session(_engine) as s:
+        return list(s.exec(select(Agent)).all())
+
+
 def create_session(agent_id: str) -> str:
     import uuid
     sid = str(uuid.uuid4())

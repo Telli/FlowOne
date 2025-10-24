@@ -7,6 +7,7 @@ from memory.store import (
     create_db,
     upsert_agent,
     get_agent,
+    list_agents,
 )
 from services.gemini_flash import synthesize_agent_card
 from observability.langfuse import trace_event
@@ -64,6 +65,17 @@ def create_agent(body: CreateAgentRequest):
 
     trace_id = trace_event("agent.create", agentId=agent_id)
     return {"agent": response_card, "trace_id": trace_id}
+
+
+@router.get("", response_model=dict)
+def list_all_agents():
+    """List all agents."""
+    agents = list_agents()
+    trace_id = trace_event("agent.list", count=len(agents))
+    return {
+        "agents": [agent.to_card() for agent in agents],
+        "trace_id": trace_id
+    }
 
 
 @router.get("/{agent_id}", response_model=dict)

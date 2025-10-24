@@ -26,7 +26,7 @@ class PersonaResponse(BaseModel):
     status: Optional[str] = None
 
 
-@router.post("/personas", response_model=PersonaResponse)
+@router.post("", response_model=PersonaResponse)
 async def create_persona(request: CreatePersonaRequest):
     """
     Create a new Tavus persona.
@@ -69,7 +69,7 @@ async def create_persona(request: CreatePersonaRequest):
     )
 
 
-@router.get("/personas")
+@router.get("")
 async def list_personas():
     """Get list of all Tavus personas."""
     trace_event("personas.list")
@@ -89,7 +89,7 @@ async def list_personas():
     }
 
 
-@router.get("/personas/{persona_id}")
+@router.get("/{persona_id}")
 async def get_persona(persona_id: str):
     """Get a specific Tavus persona by ID."""
     trace_event("personas.get", persona_id=persona_id)
@@ -108,7 +108,7 @@ async def get_persona(persona_id: str):
     }
 
 
-@router.delete("/personas/{persona_id}")
+@router.delete("/{persona_id}")
 async def delete_persona(persona_id: str):
     """Delete a Tavus persona."""
     trace_event("personas.delete", persona_id=persona_id)

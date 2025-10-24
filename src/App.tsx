@@ -21,6 +21,8 @@ import { createFlow, getFlow, putFlow, patchAgent, listFlows } from './lib/apiCl
 import { toast } from 'sonner';
 import { Toaster } from './components/ui/sonner';
 import { useUIStore } from './store/uiStore';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { ComponentErrorBoundary } from './components/ComponentErrorBoundary';
 
 import { useAgentStore } from './store/agentStore';
 
@@ -340,98 +342,107 @@ function FlowOneApp() {
   }, [setNodes, setEdges]);
 
   return (
-    <AppShell
-      appId="studio"
-      headerActions={
-        <Button
-          onClick={() => setIsAIAssistantOpen(!isAIAssistantOpen)}
-          variant={isAIAssistantOpen ? "default" : "outline"}
-          className="gap-2"
-        >
-          <Bot className="w-5 h-5" />
-          <span
-            className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-emerald-500' : 'bg-gray-400'}`}
-            title={wsConnected ? 'WebSocket connected' : 'WebSocket disconnected'}
-          />
-          AI Assistant
-        </Button>
-      }
-    >
-      <div className="h-full flex overflow-hidden">
-        <AgentPalette onTalkToAI={() => setIsAIAssistantOpen(true)} />
+    <ErrorBoundary>
+      <AppShell
+        appId="studio"
+        headerActions={
+          <Button
+            onClick={() => setIsAIAssistantOpen(!isAIAssistantOpen)}
+            variant={isAIAssistantOpen ? "default" : "outline"}
+            className="gap-2"
+          >
+            <Bot className="w-5 h-5" />
+            <span
+              className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-emerald-500' : 'bg-gray-400'}`}
+              title={wsConnected ? 'WebSocket connected' : 'WebSocket disconnected'}
+            />
+            AI Assistant
+          </Button>
+        }
+      >
+        <div className="h-full flex overflow-hidden">
+          <ComponentErrorBoundary componentName="AgentPalette">
+            <AgentPalette onTalkToAI={() => setIsAIAssistantOpen(true)} />
+          </ComponentErrorBoundary>
 
-        <div ref={reactFlowWrapper} className="flex-1">
-          <FlowCanvas
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            onDrop={onDrop}
-            onDragOver={onDragOver}
-            activeEdgeId={activeEdgeId}
-          />
-          <div className="p-3 flex gap-2 items-center">
-            <button className="px-3 py-1 border rounded" onClick={saveFlow}>Save Flow</button>
-            <select
-              className="px-2 py-1 border rounded"
-              value={selectedFlowId}
-              onChange={(e) => setSelectedFlowId(e.target.value)}
-              onFocus={async () => {
-                try {
-                  const items = await listFlows();
-                  setFlows(items.map(i => ({ id: i.id, name: i.name })));
-                } catch (e: any) {
-                  toast.error('Failed to list flows', { description: e?.message } as any);
-                }
-              }}
-            >
-              <option value="">Select a saved flow…</option>
-              {flows.map((f) => (
-                <option key={f.id} value={f.id}>{f.name}</option>
-              ))}
-            </select>
-            <button
-              className="px-3 py-1 border rounded"
-              disabled={!selectedFlowId}
-              onClick={() => selectedFlowId && loadFlow(selectedFlowId)}
-            >
-              Load
-            </button>
+          <div ref={reactFlowWrapper} className="flex-1">
+            <ComponentErrorBoundary componentName="FlowCanvas">
+              <FlowCanvas
+                nodes={nodes}
+                edges={edges}
+                onNodesChange={onNodesChange}
+                onEdgesChange={onEdgesChange}
+                onConnect={onConnect}
+                onDrop={onDrop}
+                onDragOver={onDragOver}
+                activeEdgeId={activeEdgeId}
+              />
+            </ComponentErrorBoundary>
+            <div className="p-3 flex gap-2 items-center">
+              <button className="px-3 py-1 border rounded" onClick={saveFlow}>Save Flow</button>
+              <select
+                className="px-2 py-1 border rounded"
+                value={selectedFlowId}
+                onChange={(e) => setSelectedFlowId(e.target.value)}
+                onFocus={async () => {
+                  try {
+                    const items = await listFlows();
+                    setFlows(items.map(i => ({ id: i.id, name: i.name })));
+                  } catch (e: any) {
+                    toast.error('Failed to list flows', { description: e?.message } as any);
+                  }
+                }}
+              >
+                <option value="">Select a saved flow…</option>
+                {flows.map((f) => (
+                  <option key={f.id} value={f.id}>{f.name}</option>
+                ))}
+              </select>
+              <button
+                className="px-3 py-1 border rounded"
+                disabled={!selectedFlowId}
+                onClick={() => selectedFlowId && loadFlow(selectedFlowId)}
+              >
+                Load
+              </button>
+            </div>
           </div>
-        </div>
 
-        {isAIAssistantOpen && (
-          <AIAssistant
-            onCommand={handleCommand}
-            messages={messages}
-            onTraceId={(t) => setTraceId(t)}
-            nodes={nodes}
-            edges={edges}
-            selectedNodeId={selectedAgentId}
-          />
-        )}
-      </div>
+          {isAIAssistantOpen && (
+            <ComponentErrorBoundary componentName="AIAssistant">
+              <AIAssistant
+                onCommand={handleCommand}
+                messages={messages}
+                onTraceId={(t) => setTraceId(t)}
+                nodes={nodes}
+                edges={edges}
+                selectedNodeId={selectedAgentId}
+              />
+            </ComponentErrorBoundary>
+          )}
+        </div>
 
       {/* Test Dialog */}
       {testingAgent && (
-        <AgentTestDialog
-          open={!!testingAgent}
-          onOpenChange={(open) => {
-            if (!open) {
-              setTestingAgent(null);
-              // Reset agent status
-              updateNodes((nds) =>
-                nds.map((n) =>
-                  n.data.id === testingAgent.id
-                    ? { ...n, data: { ...n.data, status: 'ai-configured' as const } }
-                    : n
-                )
-              );
-            }
-          }}
-          agent={testingAgent}
-        />
+        <ComponentErrorBoundary componentName="AgentTestDialog">
+          <AgentTestDialog
+            open={!!testingAgent}
+            onOpenChange={(open) => {
+              if (!open) {
+                setTestingAgent(null);
+                // Reset agent status
+                updateNodes((nds) =>
+                  nds.map((n) =>
+                    n.data.id === testingAgent.id
+                      ? { ...n, data: { ...n.data, status: 'ai-configured' as const } }
+                      : n
+                  )
+                );
+              }
+            }}
+            agent={testingAgent}
+          />
+        </ComponentErrorBoundary>
       )}
 
       {/* Node Config Dialog */}
@@ -439,14 +450,16 @@ function FlowOneApp() {
         (() => {
           const node = nodes.find(n => n.id === configuringNodeId);
           return node ? (
-            <NodeConfigDialog
-              open={!!configuringNodeId}
-              onOpenChange={(open) => {
-                if (!open) setConfiguringNodeId(null);
-              }}
-              nodeData={node.data}
-              onUpdate={handleNodeUpdate}
-            />
+            <ComponentErrorBoundary componentName="NodeConfigDialog">
+              <NodeConfigDialog
+                open={!!configuringNodeId}
+                onOpenChange={(open) => {
+                  if (!open) setConfiguringNodeId(null);
+                }}
+                nodeData={node.data}
+                onUpdate={handleNodeUpdate}
+              />
+            </ComponentErrorBoundary>
           ) : null;
         })()
       )}

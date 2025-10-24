@@ -1,5 +1,6 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { ErrorFallback } from './ErrorFallback';
+import logger from '../lib/logger';
 
 interface Props {
   children: ReactNode;
@@ -29,7 +30,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('[ErrorBoundary] Caught error:', error, errorInfo);
+    logger.error('Error boundary caught error', 'ErrorBoundary', { error: error.message, errorInfo });
     
     this.setState({
       error,
@@ -47,7 +48,7 @@ export class ErrorBoundary extends Component<Props, State> {
         componentStack: errorInfo.componentStack,
         timestamp: new Date().toISOString()
       })
-    }).catch(console.error);
+    }).catch((err) => logger.error('Failed to send error report', 'ErrorBoundary', err));
   }
 
   handleReset = () => {

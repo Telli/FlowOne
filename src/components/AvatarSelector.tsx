@@ -6,6 +6,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
+import logger from "../lib/logger";
 
 interface Avatar {
   id: string;
@@ -58,7 +59,7 @@ export function AvatarSelector({
         );
         setAvatars(transformedAvatars);
       } catch (err) {
-        console.error("Error fetching avatars:", err);
+        logger.error("Error fetching avatars", "AvatarSelector", err);
         setError(err instanceof Error ? err.message : "Unknown error");
       } finally {
         setLoading(false);

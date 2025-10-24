@@ -1,6 +1,11 @@
 from functools import lru_cache
 from pydantic_settings import BaseSettings
 from pydantic import field_validator
+import sys as _sys
+
+# Ensure consistent module aliasing so 'settings' and 'backend.settings' refer to the same module
+_sys.modules.setdefault("backend.settings", _sys.modules.get(__name__))
+_sys.modules.setdefault("settings", _sys.modules.get(__name__))
 
 
 

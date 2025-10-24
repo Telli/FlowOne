@@ -38,20 +38,20 @@ export function AgentPalette({ onTalkToAI }: AgentPaletteProps) {
           return;
         }
 
-        // Merge custom templates with local templates, avoiding duplicates
+        // Map API templates to AgentTemplate format using UUID as id
         const customTemplates: AgentTemplate[] = list.map((t) => ({
-          id: t.key,
+          id: t.id, // Use UUID from API, not key
           name: t.name || t.key,
           icon: <Lightbulb className="w-5 h-5" />,
           description: t.description || "",
           color: "bg-blue-500",
         }));
 
-        // Filter out local templates that have the same ID or name as custom templates
-        const customIds = new Set(customTemplates.map(t => t.id));
-        const customNames = new Set(customTemplates.map(t => t.name.toLowerCase()));
+        // Filter out local templates that have the same key as custom templates
+        // Compare using the 'key' field from API templates
+        const customKeys = new Set(list.map(t => t.key));
         const filteredLocal = localTemplates.filter(
-          t => !customIds.has(t.id) && !customNames.has(t.name.toLowerCase())
+          t => !customKeys.has(t.id) // local template id matches API template key
         );
 
         // Combine: custom templates first, then remaining local templates

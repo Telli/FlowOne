@@ -98,8 +98,8 @@ export function AgentTestDialog({ open, onOpenChange, agent }: AgentTestDialogPr
         setAvatarError(null);
         setAvatarStreamUrl(null);
 
-        console.log("[Session] Creating session with enableAvatar:", enableAvatar);
-        const sid = await createSession("agent_fitness_coach", enableAvatar);
+        console.log("[Session] Creating session for agent:", agent.id, "with enableAvatar:", enableAvatar);
+        const sid = await createSession(agent.id, enableAvatar);
         if (closed) return;
         setSessionId(sid);
         const ws = openSessionEvents(sid);

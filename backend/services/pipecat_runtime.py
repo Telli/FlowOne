@@ -253,15 +253,17 @@ class Session:
                 })
                 return
             
-            self.tavus_session_id = result.get("session_id")
-            video_stream_url = result.get("video_stream_url")
-            
+            # Phoenix REST returns conversation_id and conversation_url
+            self.tavus_session_id = result.get("conversation_id") or result.get("session_id")
+            video_stream_url = result.get("conversation_url") or result.get("video_stream_url")
+
             trace_event(
                 "avatar.started",
                 sessionId=self.id,
-                tavusSessionId=self.tavus_session_id
+                tavusSessionId=self.tavus_session_id,
+                videoStreamUrl=video_stream_url
             )
-            
+
             await self.queue.put({
                 "type": "avatar.started",
                 "sessionId": self.id,

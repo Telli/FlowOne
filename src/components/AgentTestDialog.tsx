@@ -476,8 +476,9 @@ export function AgentTestDialog({ open, onOpenChange, agent }: AgentTestDialogPr
         )}
 
         {/* Messages */}
-        <ScrollArea className="flex-1 min-h-0 pr-4">
-          <div ref={scrollRef} className="space-y-4">
+        <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+          <ScrollArea className="flex-1">
+            <div ref={scrollRef} className="space-y-4 p-4">
             {/* Avatar Stream Display */}
             {avatarStreamUrl && (
               <div className="mb-4 flex justify-center">
@@ -632,8 +633,9 @@ export function AgentTestDialog({ open, onOpenChange, agent }: AgentTestDialogPr
                 </Card>
               </motion.div>
             )}
-          </div>
-        </ScrollArea>
+            </div>
+          </ScrollArea>
+        </div>
 
         {/* Input Area */}
         <div className="flex gap-2 pt-4 border-t">

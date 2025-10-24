@@ -26,22 +26,39 @@ interface AgentPaletteProps {
 
 export function AgentPalette({ onTalkToAI }: AgentPaletteProps) {
   const [templates, setTemplates] = useState<AgentTemplate[]>(localTemplates);
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
 
   useEffect(() => {
+    setIsLoadingTemplates(true);
     getTemplates()
       .then((list: TemplateItem[]) => {
-        const mapped: AgentTemplate[] = list.map((t) => ({
+        if (!list || list.length === 0) {
+          // No custom templates, keep local defaults
+          setIsLoadingTemplates(false);
+          return;
+        }
+
+        // Merge custom templates with local templates, avoiding duplicates
+        const customTemplates: AgentTemplate[] = list.map((t) => ({
           id: t.key,
           name: t.name || t.key,
           icon: <Lightbulb className="w-5 h-5" />,
           description: t.description || "",
           color: "bg-blue-500",
         }));
-        if (mapped.length > 0) setTemplates(mapped);
+
+        // Filter out local templates that have the same ID as custom templates
+        const localIds = new Set(customTemplates.map(t => t.id));
+        const filteredLocal = localTemplates.filter(t => !localIds.has(t.id));
+
+        // Combine: custom templates first, then remaining local templates
+        setTemplates([...customTemplates, ...filteredLocal]);
+        setIsLoadingTemplates(false);
       })
       .catch((e) => {
-        toast.error('Failed to load templates', { description: (e as any)?.message } as any);
-        // keep local defaults
+        console.error('Failed to load custom templates:', e);
+        // Silently keep local defaults - don't show error toast for optional feature
+        setIsLoadingTemplates(false);
       });
   }, []);
   const onDragStart = (event: React.DragEvent, template: AgentTemplate) => {

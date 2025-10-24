@@ -47,9 +47,12 @@ export function AgentPalette({ onTalkToAI }: AgentPaletteProps) {
           color: "bg-blue-500",
         }));
 
-        // Filter out local templates that have the same ID as custom templates
-        const localIds = new Set(customTemplates.map(t => t.id));
-        const filteredLocal = localTemplates.filter(t => !localIds.has(t.id));
+        // Filter out local templates that have the same ID or name as custom templates
+        const customIds = new Set(customTemplates.map(t => t.id));
+        const customNames = new Set(customTemplates.map(t => t.name.toLowerCase()));
+        const filteredLocal = localTemplates.filter(
+          t => !customIds.has(t.id) && !customNames.has(t.name.toLowerCase())
+        );
 
         // Combine: custom templates first, then remaining local templates
         setTemplates([...customTemplates, ...filteredLocal]);

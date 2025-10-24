@@ -326,7 +326,7 @@ export function AgentTestDialog({ open, onOpenChange, agent }: AgentTestDialogPr
   };
 
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -475,94 +475,91 @@ export function AgentTestDialog({ open, onOpenChange, agent }: AgentTestDialogPr
           </Card>
         )}
 
+        {/* Avatar Stream Display - Outside ScrollArea for visibility */}
+        {avatarStreamUrl && (
+          <div className="mb-4 flex justify-center px-4">
+            <div className="w-full max-w-md">
+              <div className="text-xs text-muted-foreground mb-2 text-center flex items-center justify-center gap-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <span>Avatar Live</span>
+              </div>
+              <video
+                src={avatarStreamUrl}
+                autoPlay
+                playsInline
+                loop
+                muted={false}
+                controls={false}
+                className="w-full h-auto aspect-video bg-black rounded-lg shadow-lg border-2 border-purple-500/30"
+                onError={(e) => {
+                  console.error("[Avatar] Video element error:", e);
+                  setAvatarError("Failed to load video stream");
+                  setAvatarStreamUrl(null);
+                }}
+                onLoadedData={() => {
+                  console.log("[Avatar] Video loaded successfully");
+                }}
+                onPlay={() => {
+                  console.log("[Avatar] Video playback started");
+                }}
+              />
+            </div>
+          </div>
+        )}
+        {avatarMediaStream && !avatarStreamUrl && (
+          <div className="mb-4 flex justify-center px-4">
+            <div className="w-full max-w-md">
+              <div className="text-xs text-muted-foreground mb-2 text-center flex items-center justify-center gap-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <span>Avatar Live</span>
+              </div>
+              <video
+                ref={avatarVideoRef}
+                autoPlay
+                playsInline
+                muted={false}
+                className="w-full h-auto aspect-video bg-black rounded-lg shadow-lg border-2 border-purple-500/30"
+                onError={(e) => {
+                  console.error("[Avatar] Daily video element error:", e);
+                  setAvatarError("Failed to play Daily stream");
+                  setAvatarMediaStream(null);
+                }}
+              />
+            </div>
+          </div>
+        )}
+        {avatarLoading && !avatarError && !avatarStreamUrl && (
+          <div className="mb-4 flex justify-center px-4">
+            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 max-w-md">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
+                <div>
+                  <div className="text-sm font-medium text-purple-900">Initializing Avatar...</div>
+                  <div className="text-xs text-purple-600 mt-1">Connecting to Tavus Phoenix API</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        {avatarError && enableAvatar && !avatarStreamUrl && (
+          <div className="mb-4 flex justify-center px-4">
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 max-w-md">
+              <div className="flex items-start gap-3">
+                <div className="text-amber-600 mt-0.5">⚠️</div>
+                <div>
+                  <div className="font-medium text-amber-900 mb-1">Avatar Unavailable</div>
+                  <div className="text-xs text-amber-700">{avatarError}</div>
+                  <div className="text-xs text-amber-600 mt-2">Text chat is still available below.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Messages */}
         <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
           <ScrollArea className="flex-1">
             <div ref={scrollRef} className="space-y-4 p-4">
-            {/* Avatar Stream Display */}
-            {avatarStreamUrl && (
-              <div className="mb-4 flex justify-center">
-                <div className="w-full max-w-md">
-                  <div className="text-xs text-muted-foreground mb-2 text-center flex items-center justify-center gap-2">
-                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                    <span>Avatar Live</span>
-                  </div>
-                  <video
-                    src={avatarStreamUrl}
-                    autoPlay
-                    playsInline
-                    loop
-                    muted={false}
-                    controls={false}
-                    className="w-full h-auto aspect-video bg-black rounded-lg shadow-lg border-2 border-purple-500/30"
-                    onError={(e) => {
-                      console.error("[Avatar] Video element error:", e);
-                      setAvatarError("Failed to load video stream");
-                      setAvatarStreamUrl(null);
-                    }}
-                    onLoadedData={() => {
-                      console.log("[Avatar] Video loaded successfully");
-
-                    }}
-                    onPlay={() => {
-                      console.log("[Avatar] Video playback started");
-                    }}
-                  />
-                </div>
-              </div>
-            )}
-            {avatarMediaStream && !avatarStreamUrl && (
-              <div className="mb-4 flex justify-center">
-                <div className="w-full max-w-md">
-                  <div className="text-xs text-muted-foreground mb-2 text-center flex items-center justify-center gap-2">
-                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                    <span>Avatar Live</span>
-                  </div>
-                  <video
-                    ref={avatarVideoRef}
-                    autoPlay
-                    playsInline
-                    muted={false}
-                    className="w-full h-auto aspect-video bg-black rounded-lg shadow-lg border-2 border-purple-500/30"
-                    onError={(e) => {
-                      console.error("[Avatar] Daily video element error:", e);
-                      setAvatarError("Failed to play Daily stream");
-                      setAvatarMediaStream(null);
-                    }}
-                  />
-                </div>
-              </div>
-            )}
-            {avatarLoading && !avatarError && !avatarStreamUrl && (
-
-
-              <div className="mb-4 flex justify-center">
-                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 max-w-md">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
-                    <div>
-                      <div className="text-sm font-medium text-purple-900">Initializing Avatar...</div>
-                      <div className="text-xs text-purple-600 mt-1">Connecting to Tavus Phoenix API</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-            {avatarError && enableAvatar && !avatarStreamUrl && (
-              <div className="mb-4 flex justify-center">
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 max-w-md">
-                  <div className="flex items-start gap-3">
-                    <div className="text-amber-600 mt-0.5">⚠️</div>
-                    <div>
-                      <div className="font-medium text-amber-900 mb-1">Avatar Unavailable</div>
-                      <div className="text-xs text-amber-700">{avatarError}</div>
-
-                      <div className="text-xs text-amber-600 mt-2">Text chat is still available below.</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
 
             <AnimatePresence>
               {messages.map((message) => (
@@ -642,7 +639,7 @@ export function AgentTestDialog({ open, onOpenChange, agent }: AgentTestDialogPr
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyPress={handleKeyPress}
+            onKeyDown={handleKeyDown}
             placeholder="Type your message..."
             className="flex-1"
           />

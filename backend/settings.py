@@ -4,11 +4,7 @@ from pydantic import field_validator
 import sys as _sys
 
 # Ensure consistent module aliasing so 'settings' and 'backend.settings' refer to the same module
-_sys.modules.setdefault("backend.settings", _sys.modules.get(__name__))
-_sys.modules.setdefault("settings", _sys.modules.get(__name__))
-
-
-
+_sys.modules['backend.settings'] = _sys.modules['settings'] = _sys.modules[__name__]
 class Settings(BaseSettings):
     GEMINI_API_KEY: str = ""
     DAILY_API_KEY: str = ""

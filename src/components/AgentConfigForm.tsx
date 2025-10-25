@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Badge } from "./ui/badge";
 import { X } from "lucide-react";
 import { AvatarSelector } from "./AvatarSelector";
+import logger from "../lib/logger";
 
 interface AgentConfigFormProps {
   onSubmit: (config: {
@@ -94,7 +95,7 @@ export function AgentConfigForm({ onSubmit, initialConfig = {} }: AgentConfigFor
       const data = await response.json();
       onSubmit(data.agent);
     } catch (error) {
-      console.error('Error creating agent:', error);
+      logger.error('Error creating agent', 'AgentConfigForm', error);
       // Fallback to original behavior for now
       onSubmit({
         name,

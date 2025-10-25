@@ -1,4 +1,5 @@
 import { cache, clearCachePattern } from './cache';
+import { requestDeduplicator } from './requestDeduplication';
 
 export interface AgentCard {
   id: string;
@@ -33,17 +34,27 @@ function buildApiError(res: Response, body: any, url: string): ApiError {
 }
 
 async function fetchJson(url: string, init?: RequestInit): Promise<any> {
-  const res = await fetch(url, init);
-  let body: any = null;
-  try {
-    body = await res.json();
-  } catch {
-    body = null;
-  }
-  if (!res.ok) {
-    throw buildApiError(res, body, url);
-  }
-  return body;
+  const method = init?.method || 'GET';
+  const body = init?.body;
+  
+  return requestDeduplicator.deduplicate(
+    method,
+    url,
+    async () => {
+      const res = await fetch(url, init);
+      let responseBody: any = null;
+      try {
+        responseBody = await res.json();
+      } catch {
+        responseBody = null;
+      }
+      if (!res.ok) {
+        throw buildApiError(res, responseBody, url);
+      }
+      return responseBody;
+    },
+    body
+  );
 }
 
 // Cache TTLs (in milliseconds)
@@ -60,11 +71,18 @@ export async function createAgent(input: {
   goals: string[];
   tone: string;
 }): Promise<AgentCard> {
-  const data = await fetchJson(`${API_URL}/agents`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
-  });
+  const data = await requestDeduplicator.deduplicate(
+    "POST",
+    `${API_URL}/agents`,
+    async () => {
+      return fetchJson(`${API_URL}/agents`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+    },
+    input
+  );
   return data.agent as AgentCard;
 }
 
@@ -136,7 +154,13 @@ export async function getFlow(flowId: string): Promise<{ nodes: any[]; edges: an
   const cached = cache.get(cacheKey);
   if (cached) return cached;
 
-  const data = await fetchJson(`${API_URL}/flows/${flowId}`);
+  const data = await requestDeduplicator.deduplicate(
+    "GET",
+    `${API_URL}/flows/${flowId}`,
+    async () => {
+      return fetchJson(`${API_URL}/flows/${flowId}`);
+    }
+  );
 
   // Cache the result
   cache.set(cacheKey, data, CACHE_TTL.FLOWS);
@@ -150,7 +174,13 @@ export async function listFlows(): Promise<{ id: string; name: string; updated_a
   const cached = cache.get(cacheKey);
   if (cached) return cached;
 
-  const json = await fetchJson(`${API_URL}/flows`);
+  const json = await requestDeduplicator.deduplicate(
+    "GET",
+    `${API_URL}/flows`,
+    async () => {
+      return fetchJson(`${API_URL}/flows`);
+    }
+  );
   const flows = json.flows as any;
 
   // Cache the result

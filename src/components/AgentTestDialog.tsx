@@ -17,6 +17,7 @@ import { useToast } from "./ui/use-toast";
 import { useSessionStore } from "../store/sessionStore";
 
 import DailyIframe, { DailyCall } from "@daily-co/daily-js";
+import logger from "../lib/logger";
 
 
 interface Message {
@@ -98,7 +99,7 @@ export function AgentTestDialog({ open, onOpenChange, agent }: AgentTestDialogPr
         setAvatarError(null);
         setAvatarStreamUrl(null);
 
-        console.log("[Session] Creating session with enableAvatar:", enableAvatar);
+        logger.info("Creating session", "Session", { enableAvatar });
         const sid = await createSession("agent_fitness_coach", enableAvatar);
         if (closed) return;
         setSessionId(sid);
@@ -193,20 +194,20 @@ export function AgentTestDialog({ open, onOpenChange, agent }: AgentTestDialogPr
               const videoUrl = ev.videoStreamUrl || ev.video_stream_url || null;
               const roomUrl = ev.dailyRoomUrl || null;
               if (videoUrl) {
-                console.log("[Avatar] Stream started (Phoenix):", videoUrl);
+                logger.info("Stream started (Phoenix)", "Avatar", { videoUrl });
                 setAvatarStreamUrl(videoUrl);
                 setAvatarMediaStream(null);
                 setAvatarLoading(false);
                 setAvatarError(null);
               } else if (roomUrl) {
-                console.log("[Avatar] Joining Daily room (Pipecat):", roomUrl);
+                logger.info("Joining Daily room (Pipecat)", "Avatar", { roomUrl });
                 setAvatarStreamUrl(null);
                 setAvatarError(null);
                 void joinDailyRoomAndAttachVideo(roomUrl);
               }
             } else if (ev.type === "avatar.error") {
               const errorMsg = ev.error || "Unknown avatar error";
-              console.warn("[Avatar] Error:", errorMsg);
+              logger.warn("Avatar error", "Avatar", { error: errorMsg });
               setAvatarLoading(false);
               setAvatarError(errorMsg);
               setAvatarStreamUrl(null);
@@ -272,7 +273,7 @@ export function AgentTestDialog({ open, onOpenChange, agent }: AgentTestDialogPr
       await sendSessionMessage(sessionId, userMessage);
 
     } catch (error) {
-      console.error('[Session] Failed to send message:', error);
+      logger.error('Failed to send message', 'Session', error);
       const message = (error as any)?.message || 'Failed to send message';
       toast({ title: 'Send failed', description: message, variant: 'destructive' });
       // Add error message
@@ -319,7 +320,7 @@ export function AgentTestDialog({ open, onOpenChange, agent }: AgentTestDialogPr
 
       await call.join({ url: roomUrl, audioSource: false, videoSource: false });
     } catch (e: any) {
-      console.error('[Avatar] Daily join failed:', e);
+      logger.error('Daily join failed', 'Avatar', e);
       setAvatarError(e?.message || 'Failed to join Daily room');
       setAvatarLoading(false);
     }
@@ -495,16 +496,16 @@ export function AgentTestDialog({ open, onOpenChange, agent }: AgentTestDialogPr
                     controls={false}
                     className="w-full h-auto aspect-video bg-black rounded-lg shadow-lg border-2 border-purple-500/30"
                     onError={(e) => {
-                      console.error("[Avatar] Video element error:", e);
+                      logger.error("Video element error", "Avatar", e);
                       setAvatarError("Failed to load video stream");
                       setAvatarStreamUrl(null);
                     }}
                     onLoadedData={() => {
-                      console.log("[Avatar] Video loaded successfully");
+                      logger.info("Video loaded successfully", "Avatar");
 
                     }}
                     onPlay={() => {
-                      console.log("[Avatar] Video playback started");
+                      logger.info("Video playback started", "Avatar");
                     }}
                   />
                 </div>
@@ -524,7 +525,7 @@ export function AgentTestDialog({ open, onOpenChange, agent }: AgentTestDialogPr
                     muted={false}
                     className="w-full h-auto aspect-video bg-black rounded-lg shadow-lg border-2 border-purple-500/30"
                     onError={(e) => {
-                      console.error("[Avatar] Daily video element error:", e);
+                      logger.error("Daily video element error", "Avatar", e);
                       setAvatarError("Failed to play Daily stream");
                       setAvatarMediaStream(null);
                     }}

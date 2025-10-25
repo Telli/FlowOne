@@ -11,6 +11,7 @@ import { X, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { AgentNodeData } from './AgentNode';
 import { AvatarSelector } from './AvatarSelector';
+import logger from '../lib/logger';
 
 interface NodeConfigDialogProps {
   open: boolean;
@@ -92,7 +93,7 @@ export function NodeConfigDialog({ open, onOpenChange, nodeData, onUpdate }: Nod
       toast.success('Agent updated successfully');
       onOpenChange(false);
     } catch (error) {
-      console.error('Failed to update agent:', error);
+      logger.error('Failed to update agent', 'NodeConfigDialog', error);
       toast.error('Failed to update agent');
     } finally {
       setLoading(false);

@@ -2,6 +2,8 @@
  * Performance monitoring and metrics collection
  */
 
+import logger from './logger';
+
 interface PerformanceMetric {
   name: string;
   duration: number;
@@ -30,7 +32,7 @@ class PerformanceMonitor {
 
     const startTime = this.marks.get(name);
     if (!startTime) {
-      console.warn(`No mark found for ${name}`);
+      logger.warn(`No mark found for ${name}`, 'Performance');
       return 0;
     }
 
@@ -46,7 +48,7 @@ class PerformanceMonitor {
 
     // Log slow operations
     if (duration > 1000) {
-      console.warn(`[Performance] ${name} took ${duration.toFixed(2)}ms`);
+      logger.warn(`${name} took ${duration.toFixed(2)}ms`, 'Performance');
     }
 
     return duration;
@@ -175,7 +177,7 @@ export function getPerformanceReport() {
  * Log performance metrics to console
  */
 export function logPerformanceMetrics(): void {
-  console.log(getPerformanceReport());
+  logger.info(getPerformanceReport(), 'Performance');
 }
 
 /**
@@ -192,7 +194,7 @@ export async function sendMetricsToBackend(endpoint: string): Promise<void> {
       body: JSON.stringify({ metrics, summary })
     });
   } catch (error) {
-    console.error('Failed to send metrics:', error);
+    logger.error('Failed to send metrics', 'Performance', error);
   }
 }
 

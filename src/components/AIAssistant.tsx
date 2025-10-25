@@ -12,6 +12,7 @@ import { AgentConfigForm } from "./AgentConfigForm";
 import { nlpCommands } from "../lib/apiClient";
 import { useToast } from "./ui/use-toast";
 import { generateSuggestions, getSuggestionIcon, type Suggestion } from "../lib/suggestions";
+import logger from "../lib/logger";
 
 interface Message {
   id: string;
@@ -73,7 +74,7 @@ export function AIAssistant({ onCommand, messages, sessionEvents = [], onTraceId
     recognitionRef.current.lang = 'en-US';
 
     recognitionRef.current.onstart = () => {
-      console.log('[Voice] Started listening');
+      logger.info('Started listening', 'Voice');
       setIsListening(true);
       setVoiceError(null);
     };
@@ -98,7 +99,7 @@ export function AIAssistant({ onCommand, messages, sessionEvents = [], onTraceId
     };
 
     recognitionRef.current.onend = () => {
-      console.log('[Voice] Stopped listening');
+      logger.info('Stopped listening', 'Voice');
       setIsListening(false);
 
       // Process final transcript
@@ -110,7 +111,7 @@ export function AIAssistant({ onCommand, messages, sessionEvents = [], onTraceId
     };
 
     recognitionRef.current.onerror = (event: any) => {
-      console.error('[Voice] Error:', event.error);
+      logger.error('Voice recognition error', 'Voice', event.error);
       setIsListening(false);
 
       if (event.error === 'not-allowed') {
@@ -141,7 +142,7 @@ export function AIAssistant({ onCommand, messages, sessionEvents = [], onTraceId
       try {
         recognitionRef.current.start();
       } catch (error) {
-        console.error('[Voice] Start error:', error);
+        logger.error('Voice start error', 'Voice', error);
         toast({ title: 'Error', description: 'Failed to start voice input', variant: 'destructive' });
       }
     }
@@ -161,7 +162,7 @@ export function AIAssistant({ onCommand, messages, sessionEvents = [], onTraceId
       // Track trace ID
       if ((cmd as any).trace_id) {
         onTraceId?.((cmd as any).trace_id);
-        console.log('[NLP] trace_id:', (cmd as any).trace_id);
+        logger.debug('NLP command processed', 'NLP', { trace_id: (cmd as any).trace_id });
       }
 
       // Execute action based on NLP response
@@ -175,7 +176,7 @@ export function AIAssistant({ onCommand, messages, sessionEvents = [], onTraceId
         onCommand(text);
       }
     } catch (error) {
-      console.error('[AIAssistant] NLP error:', error);
+      logger.error('NLP processing error', 'AIAssistant', error);
       toast({ title: 'Error', description: 'Failed to process command', variant: 'destructive' });
     } finally {
       setIsProcessing(false);

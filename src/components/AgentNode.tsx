@@ -7,6 +7,7 @@ import { Badge } from './ui/badge';
 import { Input } from './ui/input';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getAgentIcon } from '../lib/agentIcons';
+import logger from '../lib/logger';
 
 export interface AgentNodeData extends Record<string, unknown> {
   id: string;
@@ -54,7 +55,7 @@ export const AgentNode = memo(({ data }: NodeProps<AgentNodeData>) => {
     recognitionRef.current.lang = 'en-US';
 
     recognitionRef.current.onstart = () => {
-      console.log('[Voice] Started listening');
+      logger.info('Started listening', 'Voice');
       setIsListening(true);
     };
 
@@ -78,12 +79,12 @@ export const AgentNode = memo(({ data }: NodeProps<AgentNodeData>) => {
     };
 
     recognitionRef.current.onend = () => {
-      console.log('[Voice] Stopped listening');
+      logger.info('Stopped listening', 'Voice');
       setIsListening(false);
     };
 
     recognitionRef.current.onerror = (event: any) => {
-      console.error('[Voice] Error:', event.error);
+      logger.error('Voice recognition error', 'Voice', event.error);
       setIsListening(false);
     };
 
@@ -113,7 +114,7 @@ export const AgentNode = memo(({ data }: NodeProps<AgentNodeData>) => {
       try {
         recognitionRef.current.start();
       } catch (error) {
-        console.error('[Voice] Start error:', error);
+        logger.error('Voice start error', 'Voice', error);
       }
     }
   };

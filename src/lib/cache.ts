@@ -3,6 +3,8 @@
  * Used for caching API responses and expensive computations
  */
 
+import * as React from 'react';
+
 interface CacheEntry<T> {
   value: T;
   timestamp: number;

@@ -2,6 +2,8 @@
  * Performance monitoring and metrics collection
  */
 
+import * as React from 'react';
+
 interface PerformanceMetric {
   name: string;
   duration: number;
